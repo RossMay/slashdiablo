@@ -22,9 +22,6 @@ ADMINS = [('Ross', 'rossmay1@gmail.com')]
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'cj84d0hhv@=p-nn=#n)=isl3pu6(sni4tf)levf5wo45g54h1@'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
