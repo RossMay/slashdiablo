@@ -5,17 +5,17 @@ from django.conf import settings
 from django.utils import timezone
 import datetime
 
-from .models import Diablo2
+from .models import Diablo2,Diablo2Character
 from django.contrib.auth.models import User
 
-import MySQLdb,pytz
+import MySQLdb,pytz,os,json
 
 def index(request):
 	return HttpResponse("Working")
 
 
-@permission_required('accounts.diablo2.sync_all')
-def sync(request):
+@permission_required('accounts.diablo2.sync.account.all')
+def sync_all_accounts(request):
 	db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 	cur = db.cursor()
 	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_username like 'verris%'")
@@ -58,3 +58,129 @@ def sync(request):
 		
 	db.close()
 	return HttpResponse("Sync")
+
+
+def bytes_to_hex(values,start,size):
+	hex = "0x"
+	for x in reversed(values[start:start+size]):
+        	hex = "%s%s" % (hex,x.encode('hex'))
+	return hex
+
+def bytes_to_string(values,start,size):
+	s = ""
+	for x in reversed(values[start:start+size]):
+		if not x or x == u'\u0000':
+			continue
+                s = "%s%s" % (s,x)
+
+	return s[::-1]
+
+def bytes_to_int(values,start,size):
+	return int(bytes_to_hex(values,start,size),16)
+
+def bytes_to_bin(values,start,size):
+	return bin(bytes_to_int(values,start,size))
+
+def d2_char_progress(val,expansion):
+	if val < 4:
+		return "None"
+	elif (not expansion and val < 8) or (expansion and val < 9):
+		return "Normal"
+	elif (not expansion and val < 12) or (expansion and val < 15):
+		return "Nightmare"
+	else:
+		return "Hell"
+
+def d2_char_status(byte):
+	expansion = byte & 32 > 0
+	died = byte & 8 > 0
+	hardcore = byte & 4 > 0
+	return (expansion,died,hardcore)
+
+def d2_char_class(byte):
+	return {
+		u'0x00': 'AM',
+		u'0x01': 'SO',
+		u'0x02': 'NE',
+		u'0x03': 'PA',
+		u'0x04': 'BA',
+		u'0x05': 'DR',
+		u'0x06': 'AS',
+	}.get(byte,'UN')
+
+def parse_character(owner,bytes):
+	expansion, died, hardcore = d2_char_status(bytes_to_int(bytes,36,1))
+	info = {
+		'expansion': expansion,
+		'died': died,
+		'hardcore': hardcore,
+		'checksum': bytes_to_hex(bytes,12,4),
+		'name': bytes_to_string(bytes,20,16),
+		'progress': d2_char_progress(bytes_to_int(bytes,37,1),expansion),
+		'class': d2_char_class(bytes_to_hex(bytes,40,1)),
+		'level': bytes_to_int(bytes,43,1),
+		'timestamp': bytes_to_hex(bytes,48,4),
+		'merc_name': bytes_to_hex(bytes,183,2),
+		'merc_code': bytes_to_hex(bytes,185,2),
+#		'merc_exp': bytes_to_int(bytes,187,4),
+
+	}
+
+	try:
+		character = Diablo2Character.objects.get(name=info['name'])
+		if character.account != owner:
+			print "New owner"
+			character.delete()
+			raise Diablo2Character.DoesNotExist
+		character.level = info['level']
+		character.cclass = info['class']
+		character.hardcore = info['hardcore']
+		character.has_died = info['died']
+		character.created = timezone.make_aware(datetime.datetime.fromtimestamp(int(info['timestamp'],16)),pytz.timezone('UTC'))
+		character.last_update = timezone.make_aware(datetime.datetime.now(),pytz.timezone('UTC'))
+		character.info = json.dumps(info)
+
+	except Diablo2Character.DoesNotExist:
+		print "New Character %s" % info['name']
+		character = Diablo2Character(
+				name=info['name'],
+				account = owner,
+				level = info['level'],
+				cclass = info['class'],
+				hardcore = info['hardcore'],
+				has_died = info['died'],
+				created = timezone.make_aware(datetime.datetime.fromtimestamp(int(info['timestamp'],16)),pytz.timezone('UTC')),
+				last_update = timezone.make_aware(datetime.datetime.now(),pytz.timezone('UTC')),
+				info = json.dumps(info)
+			)
+	character.save()
+
+@permission_required('accounts.diablo2.sync.char')
+def sync_characters(request):
+
+	for account in Diablo2.objects.all():
+	#account = Diablo2.objects.get(name='Verris')
+
+		characters = {}
+		if not os.path.exists("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
+			continue
+		for char in os.listdir("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
+
+			charfile = open("/home/slashdiablo/pvpgn/var/charsave/%s" % char, 'rb')
+			#charfile = open("/srv/slashdiablo/%s" % char, 'rb')
+	
+			byte = charfile.read(1)
+			bytes = [byte]
+			while byte != "":
+				byte = charfile.read(1)
+				bytes.append(byte)
+
+			charfile.close()
+
+			try:
+				parse_character(account,bytes)
+			except Exception, e:
+				print "Failed to parse %s on %s - Probably hasn't logged in" % (char,account.name.lower())
+
+
+	return HttpResponse("Sync chars")
