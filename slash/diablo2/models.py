@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from django.db import models
 
-class Diablo2(models.Model):
+class Account(models.Model):
 	STATUS = (
 		('A', 'Active'),
 		('B', 'Banned')
@@ -25,18 +25,18 @@ class Diablo2(models.Model):
 	last_character_update = models.DateTimeField(blank=True,null=True,help_text='Last time character data was updated')
 
 	class Meta:
-		verbose_name = "Diablo2 Account"
+		verbose_name = "Account"
 		permissions = (
-			("diablo2.sync.account", 	"Can resync Diablo 2 accounts"),
-			("diablo2.sync.account.all", 	"Can resync all Diablo 2 accounts at once"),
-			("diablo2.sync.char", 		"Can resync Diablo 2 characters"),
-			("diablo2.sync.char.all", 	"Can resync all Diablo 2 characters at once"),
+			("diablo2.account.sync", 	"Can resync Diablo 2 accounts"),
+			("diablo2.account.sync.all", 	"Can resync all Diablo 2 accounts at once"),
+			("diablo2.character.sync", 	"Can resync Diablo 2 characters"),
+			("diablo2.character.sync.all", 	"Can resync all Diablo 2 characters at once"),
 		)
 
 	def __unicode__(self):
 		return self.name
 
-class Diablo2Character(models.Model):
+class Character(models.Model):
 	CLASS = (
 		('SO', 'Sorceress'),
 		('PA', 'Paladin'),
@@ -49,7 +49,7 @@ class Diablo2Character(models.Model):
 	)
 
 	name = models.CharField(max_length=25,help_text='Character Name')
-	account = models.ForeignKey(Diablo2,help_text='Diablo2 Account')
+	account = models.ForeignKey(Account,help_text='Diablo2 Account')
 	level = models.IntegerField(default=1,help_text='Character Level')
 	cclass = models.CharField(default='UN',choices=CLASS,max_length=2,help_text='Character Class')
 	hardcore = models.BooleanField(default=False,help_text='Character is hardcore')
@@ -59,7 +59,7 @@ class Diablo2Character(models.Model):
 	info = models.TextField(blank=True)
 	
 	class Meta:
-		verbose_name = "Diablo2 Character"
+		verbose_name = "Character"
 
 	def __unicode__(self):
 		return self.name

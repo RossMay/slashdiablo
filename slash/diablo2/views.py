@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 import datetime
 
-from .models import Diablo2,Diablo2Character
+from .models import Account,Character
 from django.contrib.auth.models import User
 
 import MySQLdb,pytz,os,json
@@ -14,8 +14,8 @@ def index(request):
 	return HttpResponse("Working")
 
 
-@permission_required('accounts.diablo2.sync.account.all')
-def sync_all_accounts(request):
+@permission_required('diablo2.account.sync.all')
+def account_sync_all(request):
 	db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 	cur = db.cursor()
 	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_username like 'verris%'")
@@ -46,12 +46,12 @@ def sync_all_accounts(request):
 				user = False
 
 		try:
-			account = Diablo2.objects.get(name=entry['name'])
+			account = Account.objects.get(name=entry['name'])
 			#update
 			print "Exists! - %s" % entry['name']
-		except Diablo2.DoesNotExist:
+		except Account.DoesNotExist:
 			#create
-			account = Diablo2(name=entry['name'],owner=user if user else None,user_id=entry['id'],admin=entry['admin'],operator=entry['operator'],locked=entry['locked'],commandgroups=entry['commandgroups'],lastlogin=timezone.make_aware(entry['time'],pytz.timezone('UTC')),lastlogin_ip=entry['ip'],status='B' if entry['locked'] else 'A',email=entry['email'])
+			account = Account(name=entry['name'],owner=user if user else None,user_id=entry['id'],admin=entry['admin'],operator=entry['operator'],locked=entry['locked'],commandgroups=entry['commandgroups'],lastlogin=timezone.make_aware(entry['time'],pytz.timezone('UTC')),lastlogin_ip=entry['ip'],status='B' if entry['locked'] else 'A',email=entry['email'])
 			account.save()
 			print "Doesnt exist! - %s" % entry['name']
 
@@ -60,13 +60,13 @@ def sync_all_accounts(request):
 	return HttpResponse("Sync")
 
 
-def bytes_to_hex(values,start,size):
+def parse_bytes_to_hex(values,start,size):
 	hex = "0x"
 	for x in reversed(values[start:start+size]):
         	hex = "%s%s" % (hex,x.encode('hex'))
 	return hex
 
-def bytes_to_string(values,start,size):
+def parse_bytes_to_string(values,start,size):
 	s = ""
 	for x in reversed(values[start:start+size]):
 		if not x or x == u'\u0000':
@@ -75,13 +75,13 @@ def bytes_to_string(values,start,size):
 
 	return s[::-1]
 
-def bytes_to_int(values,start,size):
-	return int(bytes_to_hex(values,start,size),16)
+def parse_bytes_to_int(values,start,size):
+	return int(parse_bytes_to_hex(values,start,size),16)
 
-def bytes_to_bin(values,start,size):
-	return bin(bytes_to_int(values,start,size))
+def parse_bytes_to_bin(values,start,size):
+	return bin(parse_bytes_to_int(values,start,size))
 
-def d2_char_progress(val,expansion):
+def parse_char_progress(val,expansion):
 	if val < 4:
 		return "None"
 	elif (not expansion and val < 8) or (expansion and val < 9):
@@ -91,13 +91,13 @@ def d2_char_progress(val,expansion):
 	else:
 		return "Hell"
 
-def d2_char_status(byte):
+def parse_char_status(byte):
 	expansion = byte & 32 > 0
 	died = byte & 8 > 0
 	hardcore = byte & 4 > 0
 	return (expansion,died,hardcore)
 
-def d2_char_class(byte):
+def parse_char_class(byte):
 	return {
 		u'0x00': 'AM',
 		u'0x01': 'SO',
@@ -109,29 +109,29 @@ def d2_char_class(byte):
 	}.get(byte,'UN')
 
 def parse_character(owner,bytes):
-	expansion, died, hardcore = d2_char_status(bytes_to_int(bytes,36,1))
+	expansion, died, hardcore = parse_char_status(parse_bytes_to_int(bytes,36,1))
 	info = {
 		'expansion': expansion,
 		'died': died,
 		'hardcore': hardcore,
-		'checksum': bytes_to_hex(bytes,12,4),
-		'name': bytes_to_string(bytes,20,16),
-		'progress': d2_char_progress(bytes_to_int(bytes,37,1),expansion),
-		'class': d2_char_class(bytes_to_hex(bytes,40,1)),
-		'level': bytes_to_int(bytes,43,1),
-		'timestamp': bytes_to_hex(bytes,48,4),
-		'merc_name': bytes_to_hex(bytes,183,2),
-		'merc_code': bytes_to_hex(bytes,185,2),
-#		'merc_exp': bytes_to_int(bytes,187,4),
+		'checksum': parse_bytes_to_hex(bytes,12,4),
+		'name': parse_bytes_to_string(bytes,20,16),
+		'progress': parse_char_progress(parse_bytes_to_int(bytes,37,1),expansion),
+		'class': parse_char_class(parse_bytes_to_hex(bytes,40,1)),
+		'level': parse_bytes_to_int(bytes,43,1),
+		'timestamp': parse_bytes_to_hex(bytes,48,4),
+		'merc_name': parse_bytes_to_hex(bytes,183,2),
+		'merc_code': parse_bytes_to_hex(bytes,185,2),
+#		'merc_exp': parse_bytes_to_int(bytes,187,4),
 
 	}
 
 	try:
-		character = Diablo2Character.objects.get(name=info['name'])
+		character = Character.objects.get(name=info['name'])
 		if character.account != owner:
 			print "New owner"
 			character.delete()
-			raise Diablo2Character.DoesNotExist
+			raise Character.DoesNotExist
 		character.level = info['level']
 		character.cclass = info['class']
 		character.hardcore = info['hardcore']
@@ -140,9 +140,9 @@ def parse_character(owner,bytes):
 		character.last_update = timezone.make_aware(datetime.datetime.now(),pytz.timezone('UTC'))
 		character.info = json.dumps(info)
 
-	except Diablo2Character.DoesNotExist:
+	except Character.DoesNotExist:
 		print "New Character %s" % info['name']
-		character = Diablo2Character(
+		character = Character(
 				name=info['name'],
 				account = owner,
 				level = info['level'],
@@ -155,10 +155,10 @@ def parse_character(owner,bytes):
 			)
 	character.save()
 
-@permission_required('accounts.diablo2.sync.char')
-def sync_characters(request):
+@permission_required('diablo2.character.sync')
+def character_sync(request):
 
-	for account in Diablo2.objects.all():
+	for account in Account.objects.all():
 	#account = Diablo2.objects.get(name='Verris')
 
 		characters = {}
