@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Slash Gaming - Diablo2{% endblock %}
+
+{% block extra-styles %}
+<link href="/media/theme/css/datatables/tools/css/dataTables.tableTools.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+	<div class="">
+		<div class="page-title">
+			<div class="title_left">
+				<h3>Diablo2 <small>Accounts</small></h3>
+			</div>
+		</div>
+		<div class="clearfix"></div>
+
+		<div class="row">
+
+			<div class="col-md-12 col-sm-12 col-xs-12">
+				<div class="x_panel">
+					<div class="x_title">
+						<h2>Account List <small>SlashDiablo</small></h2>
+						<div class="clearfix"></div>
+					</div>
+					<div class="x_content">
+						<table id="example" class="table table-striped responsive-utilities jambo_table">
+							<thead>
+								<tr class="headings">
+									<th>Account </th>
+									<th>Email </th>
+									<th>Characters </th>
+									<th>Status </th>
+									<th>Last Login </th>
+									<th class="last">Last Update </th>
+								</tr>
+							</thead>
+							<tbody>
+								{% for account in accounts %}
+								<tr class="{% cycle 'odd' 'even' %} pointer">
+									<td class=" "><a href="/diablo2/accounts/">{{ account.name }}</a></td>
+									<td class=" ">{{ account.email }}</td>
+									<td class=" ">{{ account.characters }}</td>
+									<td class=" ">{{ account.get_status_display }}</td>
+									<td class=" ">{{ account.lastlogin }}</td>
+									<td class=" last">{{ account.last_update }}</td>
+								</tr>
+								{% endfor %}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<br />
+			<br />
+			<br />
+		</div>
+	</div>
+{% endblock %}
+{% block extra-scripts %}
+	<script src="/media/theme/js/datatables/js/jquery.dataTables.js"></script>
+	<script src="/media/theme/js/datatables/tools/js/dataTables.tableTools.js"></script>
+	<script>
+		var asInitVals = new Array();
+		$(document).ready(function () {
+			var oTable = $('#example').dataTable({
+							"oLanguage": {
+								"sSearch": "Search all columns:"
+							},
+							'iDisplayLength': 12,
+							"sPaginationType": "full_numbers",
+							"dom": 'lfrtip'
+					});
+			$("tfoot input").keyup(function () {
+				oTable.fnFilter(this.value, $("tfoot th").index($(this).parent()));
+			});
+			$("tfoot input").each(function (i) {
+				asInitVals[i] = this.value;
+			});
+			$("tfoot input").focus(function () {
+				if (this.className == "search_init") {
+					this.className = "";
+					this.value = "";
+				}
+			});
+			$("tfoot input").blur(function (i) {
+				if (this.value == "") {
+					this.className = "search_init";
+					this.value = asInitVals[$("tfoot input").index(this)];
+				}
+			});
+		});
+	</script>
+{% endblock %}

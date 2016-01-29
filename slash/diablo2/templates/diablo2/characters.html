@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Slash Gaming - Diablo2{% endblock %}
+
+{% block extra-styles %}
+<link href="/media/theme/css/datatables/tools/css/dataTables.tableTools.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+	<div class="">
+		<div class="page-title">
+			<div class="title_left">
+				<h3>Diablo2 <small>Characters</small></h3>
+			</div>
+		</div>
+		<div class="clearfix"></div>
+
+		<div class="row">
+
+			<div class="col-md-12 col-sm-12 col-xs-12">
+				<div class="x_panel">
+					<div class="x_title">
+						<h2>Character List <small>SlashDiablo</small></h2>
+						<div class="clearfix"></div>
+					</div>
+					<div class="x_content">
+						<table id="example" class="table table-striped responsive-utilities jambo_table">
+							<thead>
+								<tr class="headings">
+									<th>Name </th>
+									<th>Account </th>
+									<th>Level </th>
+									<th>Class </th>
+									<th>Type </th>
+									<th>Status </th>
+									<th>Created </th>
+									<th class="last">Last Update </th>
+								</tr>
+							</thead>
+							<tbody>
+								{% for char in characters %}
+								<tr class="{% cycle 'odd' 'even' %} pointer">
+									<td class=" ">{{ char.name }}</td>
+									<td class=" ">{{ char.account.name }}</td>
+									<td class=" ">{{ char.level }}</td>
+									<td class=" ">{{ char.get_cclass_display }}</td>
+									<td class=" ">{% if char.hardcore %}HC{% else %}SC{% endif %}{% if char.expansion %}XP{% else %}CL{% endif %}</td>
+									<td class=" "><i class="fa {% if char.hardcore and char.has_died %}fa-heart-0{% else %}fa-heart{% endif %}"></i></td>
+									<td class=" ">{{ char.created }}</td>
+									<td class=" last">{{ char.last_update }}</td>
+								</tr>
+								{% endfor %}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<br />
+			<br />
+			<br />
+		</div>
+	</div>
+{% endblock %}
+{% block extra-scripts %}
+	<script src="/media/theme/js/datatables/js/jquery.dataTables.js"></script>
+	<script src="/media/theme/js/datatables/tools/js/dataTables.tableTools.js"></script>
+	<script>
+		var asInitVals = new Array();
+		$(document).ready(function () {
+			var oTable = $('#example').dataTable({
+							"oLanguage": {
+								"sSearch": "Search all columns:"
+							},
+							'iDisplayLength': 12,
+							"sPaginationType": "full_numbers",
+							"dom": 'lfrtip'
+					});
+			$("tfoot input").keyup(function () {
+				oTable.fnFilter(this.value, $("tfoot th").index($(this).parent()));
+			});
+			$("tfoot input").each(function (i) {
+				asInitVals[i] = this.value;
+			});
+			$("tfoot input").focus(function () {
+				if (this.className == "search_init") {
+					this.className = "";
+					this.value = "";
+				}
+			});
+			$("tfoot input").blur(function (i) {
+				if (this.value == "") {
+					this.className = "search_init";
+					this.value = asInitVals[$("tfoot input").index(this)];
+				}
+			});
+		});
+	</script>
+{% endblock %}
