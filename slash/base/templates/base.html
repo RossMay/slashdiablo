@@ -10,7 +10,7 @@
 	{% block extra-meta %}
 	{% endblock %}
 
-	<title>{% block title %}Slash Gaming - {% endblock %}</title>
+	<title>{% block title %}Slash Gaming - Home{% endblock %}</title>
 
 	<link href="/media/theme/css/bootstrap.min.css" rel="stylesheet">
 	<link href="/media/theme/fonts/css/font-awesome.min.css" rel="stylesheet">
@@ -24,9 +24,6 @@
 
 	<script src="/media/theme/js/jquery.min.js"></script>
 	<script src="/media/theme/js/nprogress.js"></script>
-	<!--[if lt IE 9]>
-		<script src="../assets/js/ie8-responsive-file-warning.js"></script>
-	<![endif]-->
 	<!--[if lt IE 9]>
 		<script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
 		<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
@@ -42,7 +39,7 @@
 			<div class="col-md-3 left_col">
 				<div class="left_col scroll-view">
 					<div class="navbar nav_title" style="border: 0;">
-						<a href="/" class="site_title"><span>Slash Gaming</span></a>
+						<a href="/" class="site_title"><i class="fa fa-fire"></i> <span>Slash Gaming</span></a>
 					</div>
 					<div class="clearfix"></div>
 					<div class="profile">
@@ -54,85 +51,66 @@
 							<h2>{% if request.user.is_authenticated %}{{ request.user.username|capfirst }}{% else %}Anonymous{% endif %}</h2>
 						</div>
 					</div>
-					<!-- /menu prile quick info -->
-
 					<br />
-
-					<!-- sidebar menu -->
 					<div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
-
 						<div class="menu_section">
 							<h3>&nbsp;</h3>
 							<ul class="nav side-menu">
-								<li><a><i class="fa fa-fire"></i> Diablo2 <span class="fa fa-chevron-down"></span></a>
+								<li>
+									<a><i class="fa fa-fire"></i> Diablo2 <span class="fa fa-chevron-down"></span></a>
 									<ul class="nav child_menu" style="display: none">
-										<li><a href="index.html">Accounts</a>
+										<li>
+											<a href="/diablo2/accounts/">Accounts</a>
 										</li>
-										<li><a href="index2.html">Characters</a>
+										<li>
+											<a href="/diablo2/characters/">Characters</a>
 										</li>
-										<li><a href="index3.html">Moderation</a>
+										{% if perms.diablo2.moderation_enabled %}
+										<li>
+											<a href="/diablo2/moderation/">Moderation</a>
 										</li>
+										{% endif %}
 									</ul>
 								</li>
-								<li><a><i class="fa fa-dollar"></i> Slash Premium <span class="label label-success pull-right">Soon</span></a>
+								<li>
+									<a href="/diablo2/premium/"><i class="fa fa-lock"></i> Slash Premium <span class="label label-primary pull-right">Unlock Now</span></a>
 								</li>
 							</ul>
 						</div>
-
 					</div>
-					<!-- /sidebar menu -->
-
-					<!-- /menu footer buttons -->
-					<div class="sidebar-footer hidden-small">
-						<a data-toggle="tooltip" data-placement="top" title="Settings">
-							<span class="glyphicon glyphicon-cog" aria-hidden="true"></span>
-						</a>
-						<a data-toggle="tooltip" data-placement="top" title="FullScreen">
-							<span class="glyphicon glyphicon-fullscreen" aria-hidden="true"></span>
-						</a>
-						<a data-toggle="tooltip" data-placement="top" title="Lock">
-							<span class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>
-						</a>
-						<a data-toggle="tooltip" data-placement="top" title="Logout">
-							<span class="glyphicon glyphicon-off" aria-hidden="true"></span>
-						</a>
-					</div>
-					<!-- /menu footer buttons -->
 				</div>
 			</div>
-
-			<!-- top navigation -->
 			<div class="top_nav">
-
 				<div class="nav_menu">
 					<nav class="" role="navigation">
 						<div class="nav toggle">
 							<a id="menu_toggle"><i class="fa fa-bars"></i></a>
 						</div>
-
 						<ul class="nav navbar-nav navbar-right">
 							<li class="">
 								<a href="javascript:;" class="user-profile dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-									<img src="/media/theme/images/d2logo.png" alt="">John Doe
+									<img src="/media/theme/images/d2logo.png" alt="">{% if request.user.is_authenticated %}{{ request.user.username|capfirst }}{% else %}Anonymous{% endif %}
 									<span class=" fa fa-angle-down"></span>
 								</a>
 								<ul class="dropdown-menu dropdown-usermenu animated fadeInDown pull-right">
-									<li><a href="javascript:;">  Profile</a>
+									{% if request.user.is_authenticated %}
+									<li>
+										<a href="/profile/"><i class="fa fa-user pull-right"></i>Profile</a>
 									</li>
 									<li>
-										<a href="javascript:;">
-											<span class="badge bg-red pull-right">50%</span>
-											<span>Settings</span>
-										</a>
+										<a href="/settings/"><i class="fa fa-gear pull-right"></i> Settings</a>
 									</li>
 									<li>
-										<a href="javascript:;">Help</a>
+										<a href="/logout/"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
 									</li>
-									<li><a href="login.html"><i class="fa fa-sign-out pull-right"></i> Log Out</a>
+									{% else %}
+									<li>
+										<a href="/login/"><i class="fa fa-sign-in pull-right"></i> Log In</a>
 									</li>
+									{% endif %}
 								</ul>
 							</li>
-
+							{% if request.user.is_authenticated %}
 							<li role="presentation" class="dropdown">
 								<a href="javascript:;" class="dropdown-toggle info-number" data-toggle="dropdown" aria-expanded="false">
 									<i class="fa fa-envelope-o"></i>
@@ -142,42 +120,41 @@
 									<li>
 										<a>
 											<span class="image">
-										<img src="/media/theme/images/d3logo.png" alt="Profile Image" />
-									</span>
+												<img src="/media/theme/images/d3logo.png" alt="Profile Image" />
+											</span>
 											<span>
-										<span>John Smith</span>
-											<span class="time">3 mins ago</span>
+												<span>Diablo (Lord of Terror)</span>
+												<span class="time">666 mins ago</span>
 											</span>
 											<span class="message">
-										Film festivals used to be do-or-die moments for movie makers. They were where... 
-									</span>
+												Your Slash Premium subscription has expired
+											</span>
 										</a>
 									</li>
 									<li>
 										<div class="text-center">
 											<a>
-												<strong><a href="inbox.html">See All Alerts</strong>
+												<strong><a href="/alerts/">See All Alerts</strong>
 												<i class="fa fa-angle-right"></i>
 											</a>
 										</div>
 									</li>
 								</ul>
 							</li>
-
+							{% endif %}
 						</ul>
 					</nav>
 				</div>
 
 			</div>
-			<!-- /top navigation -->
-
-
-			<!-- page content -->
 			<div class="right_col" role="main">
-
+				{% block content %}
+				{% endblock %}
 				<footer>
 					<div class="">
-						<p class="pull-right">Slash Gaming 2016</p>
+						<p class="pull-right">&copy;{% now "Y" %}  Slash Gaming <strong><a href="https://reddit.com/r/slashdiablo">/r/slashdiablo/</a></strong> |
+			                            <span class="lead"> <i class="fa fa-fire"></i> Slash Gaming</span>
+                        			</p>
 					</div>
 					<div class="clearfix"></div>
 				</footer>
@@ -206,6 +183,8 @@
 	<script type="text/javascript" src="/media/theme/js/datepicker/daterangepicker.js"></script>
 
 	<script src="/media/theme/js/custom.js"></script>
+	{% block extra-scripts %}
+	{% endblock %}
 
 </body>
 

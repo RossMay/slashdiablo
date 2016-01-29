@@ -23,9 +23,9 @@ ADMINS = [('Ross', 'rossmay1@gmail.com')]
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['slashdiablo.net']
+ALLOWED_HOSTS = ['.slashdiablo.net','.slashdiablo.net.','127.0.0.1']
 
 
 # Application definition
@@ -125,3 +125,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 
 STATIC_URL = '/static/'
+
+LOGIN_URL = '/login/'

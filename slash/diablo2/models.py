@@ -23,14 +23,16 @@ class Account(models.Model):
 	email = models.EmailField(blank=True,null=True,help_text='Diablo 2 registered email address')
 	last_update = models.DateTimeField(blank=True,null=True,help_text='Last time the account was updated from the database')
 	last_character_update = models.DateTimeField(blank=True,null=True,help_text='Last time character data was updated')
+	characters = models.IntegerField(default=0,help_text='Number of characters as of last update')
 
 	class Meta:
 		verbose_name = "Account"
 		permissions = (
-			("diablo2.account.sync", 	"Can resync Diablo 2 accounts"),
-			("diablo2.account.sync.all", 	"Can resync all Diablo 2 accounts at once"),
-			("diablo2.character.sync", 	"Can resync Diablo 2 characters"),
-			("diablo2.character.sync.all", 	"Can resync all Diablo 2 characters at once"),
+			("diablo2.account_sync", 	"Can resync Diablo 2 accounts"),
+			("diablo2.account_sync_all", 	"Can resync all Diablo 2 accounts at once"),
+			("diablo2.character_sync", 	"Can resync Diablo 2 characters"),
+			("diablo2.character_sync_all", 	"Can resync all Diablo 2 characters at once"),
+			("diablo2.moderation_enabled", 	"Can access moderation tools"),
 		)
 
 	def __unicode__(self):
@@ -57,7 +59,8 @@ class Character(models.Model):
 	created = models.DateTimeField(help_text='Date created (Determines ladder)')
 	last_update = models.DateTimeField(blank=True,null=True,help_text='Last time the character was updated')
 	info = models.TextField(blank=True)
-	
+	expansion = models.BooleanField(default=True,help_text='Character is expansion')
+
 	class Meta:
 		verbose_name = "Character"
 

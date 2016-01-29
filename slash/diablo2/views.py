@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required,permission_required
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 from django.utils import timezone
 import datetime
@@ -10,15 +10,31 @@ from django.contrib.auth.models import User
 
 import MySQLdb,pytz,os,json
 
-def index(request):
-	return HttpResponse("Working")
+#ssh slash@gs.slashdiablo.net 'cmd /c echo|set /p=>c:\D2GS\Testlog.log'
 
+def premium(request):
+	return render(request,'diablo2/premium.html',{})
 
-@permission_required('diablo2.account.sync.all')
-def account_sync_all(request):
+@login_required
+def accounts(request):
+	account_sync_owner(request.user)
+	accounts = Account.objects.filter(owner=request.user)
+	return render(request,'diablo2/accounts.html',{'accounts':accounts})
+
+@login_required
+def characters(request):
+	sync_character_user(request.user)
+	characters = Character.objects.filter(account__owner=request.user)
+	return render(request,'diablo2/characters.html',{'characters':characters})
+
+@permission_required('diablo2.moderation_enabled')
+def moderation(request):
+	return render(request,'diablo2/moderation.html',{})
+
+def account_sync(query):
 	db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 	cur = db.cursor()
-	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_username like 'verris%'")
+	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where %s" % query)
 
 	for row in cur.fetchall():
 		if not row[0]:
@@ -47,16 +63,23 @@ def account_sync_all(request):
 
 		try:
 			account = Account.objects.get(name=entry['name'])
-			#update
+			#update the account
 			print "Exists! - %s" % entry['name']
 		except Account.DoesNotExist:
-			#create
 			account = Account(name=entry['name'],owner=user if user else None,user_id=entry['id'],admin=entry['admin'],operator=entry['operator'],locked=entry['locked'],commandgroups=entry['commandgroups'],lastlogin=timezone.make_aware(entry['time'],pytz.timezone('UTC')),lastlogin_ip=entry['ip'],status='B' if entry['locked'] else 'A',email=entry['email'])
 			account.save()
 			print "Doesnt exist! - %s" % entry['name']
-
-		
 	db.close()
+	return True
+
+def account_sync_owner(user):
+	for account in Account.objects.filter(owner=user).filter(email=""):
+		account_sync("acct_userid = '%d'" % account.user_id)
+	account_sync("acct_email = '%s'" % user.email.replace(';',''))
+	return HttpResponseRedirect('/diablo2/accounts/')
+	
+@permission_required('diablo2.account_sync_all')
+def account_sync_all(request):
 	return HttpResponse("Sync")
 
 
@@ -155,32 +178,39 @@ def parse_character(owner,bytes):
 			)
 	character.save()
 
-@permission_required('diablo2.character.sync')
-def character_sync(request):
+def sync_character(char,account):
+	charfile = open("/home/slashdiablo/pvpgn/var/charsave/%s" % char, 'rb')
+	byte = charfile.read(1)
+	bytes = [byte]
+	while byte != "":
+		byte = charfile.read(1)
+		bytes.append(byte)
 
+	charfile.close()
+
+	try:
+		parse_character(account,bytes)
+	except Exception, e:
+		print "Failed to parse %s on %s - Probably hasn't logged in" % (char,account.name.lower())
+		return False
+	return True
+
+def sync_character_account(account):
+	characters = {}
+	if not os.path.exists("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
+		return False
+	for char in os.listdir("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
+		sync_character(char,account)
+
+	return True
+
+def sync_character_user(user):
+	for account in Account.objects.filter(owner=user):
+		sync_character_account(account)
+	return True
+
+def sync_character_all():
 	for account in Account.objects.all():
-	#account = Diablo2.objects.get(name='Verris')
+		sync_character_account(account)
 
-		characters = {}
-		if not os.path.exists("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
-			continue
-		for char in os.listdir("/home/slashdiablo/pvpgn/var/charinfo/%s" % account.name.lower()):
-
-			charfile = open("/home/slashdiablo/pvpgn/var/charsave/%s" % char, 'rb')
-			#charfile = open("/srv/slashdiablo/%s" % char, 'rb')
-	
-			byte = charfile.read(1)
-			bytes = [byte]
-			while byte != "":
-				byte = charfile.read(1)
-				bytes.append(byte)
-
-			charfile.close()
-
-			try:
-				parse_character(account,bytes)
-			except Exception, e:
-				print "Failed to parse %s on %s - Probably hasn't logged in" % (char,account.name.lower())
-
-
-	return HttpResponse("Sync chars")
+	return True
