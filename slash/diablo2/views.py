@@ -1,14 +1,13 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required,permission_required
+from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect
 from django.conf import settings
 from django.utils import timezone
-import datetime
 
-from .models import Account,Character
-from django.contrib.auth.models import User
+from .models import Account,Character,FailedLog,GameserverLog
 
-import MySQLdb,pytz,os,json
+import MySQLdb,pytz,os,json,datetime,re
 
 #ssh slash@gs.slashdiablo.net 'cmd /c echo|set /p=>c:\D2GS\Testlog.log'
 
@@ -214,3 +213,82 @@ def sync_character_all():
 		sync_character_account(account)
 
 	return True
+
+@permission_required('diablo2.log_parse')
+def update_logs(request):
+	parse_log("/srv/slashdiablo/www/logs/d2gs.log")
+	return HttpResponse("Done")
+
+def parse_log(file):
+	ignored = []
+	prev_created_game = {'parsed':{},'message':''}
+	with open(file,'r') as f:
+		for line in f:
+			parsed = re.match(r'(?P<date>\d\d/\d\d) (?P<time>\d\d:\d\d:\d\d\.\d\d\d) (?P<type>\w+): (?P<message>.*)', line)
+			if parsed:
+				event = parsed.groupdict()
+				if event['type'] == 'D2CSCreateEmptyGame':
+					details = re.match(r'Created game \'(?P<game>.*?)\', (?P<id>\d+),(?P<exp>\w+),(?P<difficulty>\w+),(?P<mode>\w+),(?P<ladder>[\w\-]+).*', event['message'].replace('\r',''))
+					if details:
+						prev_created_game['parsed'] = details.groupdict().copy()
+						prev_created_game['message'] = event['message'].replace('\r','')
+						continue
+					else:
+						details = re.match(r'GameInfo: \'(?P<game>.*?)\',\'(?P<password>.*?)\',\'(?P<description>.*?)\', By (?P<character>[\w\-]+)\((?P<account>\*[\w\-]+)\)@(?P<ip>[\d\.]+)', event['message'].replace('\r',''))
+						if details:
+							log = details.groupdict()
+							if log['game'] == prev_created_game['parsed']['game']:
+								log.update(prev_created_game['parsed'])
+								log['type'] = 'D2CSCreateEmptyGame'
+							else:
+								FailedLog(message="%s %s - Failed to merge \'D2CSCreateEmptyGame\' - %s - %s" % (event['date'],event['time'],event['message'].replace('\r',''),prev_created_game['message'])).save()
+							
+						else:
+							FailedLog(message="Failed to parse \'D2CSCreateEmptyGame\' - %s" % event['message'].replace('\r','')).save()
+	
+				elif event['type'] == 'D2GSCBEnterGame':
+					details = re.match(r'(?P<character>[\w\-]+)\((?P<account>\*[\w\-]+)\)\[L=(?P<level>\d+),C=(?P<cclass>\w+)\]@(?P<ip>[\d\.]+) enter game \'(?P<game>.*?)\', id=(?P<id>\d+)\((?P<exp>\w+),(?P<difficulty>\w+),(?P<mode>\w+),(?P<ladder>[\w\-]+)\)', event['message'].replace('\r',''))
+					if details:
+						log = details.groupdict()
+						log['type'] = 'D2GSCBEnterGame'
+					else:
+						FailedLog(message="Failed to parse \'D2GSCBEnterGame\' - %s" % event['message'].replace('\r','')).save()
+	
+				elif event['type'] == 'D2GSCBLeaveGame':
+					details = re.match(r'(?P<character>[\w\-]+)\((?P<account>\*[\w\-]+)\)\[L=(?P<level>\d+),C=(?P<cclass>\w+)\] leave game \'(?P<game>.*?)\', id=(?P<id>\d+)\((?P<exp>\w+),(?P<difficulty>\w+),(?P<mode>\w+),(?P<ladder>[\w\-]+)\)', event['message'].replace('\r',''))
+					if details:
+						log = details.groupdict()
+						log['type'] = 'D2GSCBLeaveGame'
+					else:
+						FailedLog(message="Failed to parse \'D2GSCBLeaveGame\' - %s" % event['message'].replace('\r','')).save()
+	
+				else:
+					continue
+			else:
+				continue
+
+			today = datetime.date.today() 
+			dt = datetime.datetime.strptime("%s/%s %s" % (event['date'], today.year if int(event['date'].split('/')[0]) <= today.month else today.year - 1,event['time'].split('.')[0]), "%m/%d/%Y %H:%M:%S")
+
+			GameserverLog(	date = dt,
+					type = log['type'],
+			
+					ip = log.get('ip',None),
+					character = None,
+					character_name = log.get('character',None),
+					account = None,
+					account_name = log.get('account',None),
+
+					game_id = log.get('id',None),
+					name = log.get('game',None),
+					password = log.get('password',''),
+					description = log.get('description',''),
+
+					ladder = True if log.get('ladder','non-ladder') == 'ladder' else False,
+					difficulty = log.get('difficulty','Unknown'),					
+					hardcore = True if log.get('mode','softcore') == 'hardcore' else False,
+					expansion = True if log.get('exp','cl') == 'exp' else False,
+			
+					cclass = log.get('cclass','Unknown'),
+					level = int(log.get('level',0))).save()
+					

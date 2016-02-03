@@ -23,7 +23,7 @@ ADMINS = [('Ross', 'rossmay1@gmail.com')]
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['.slashdiablo.net','.slashdiablo.net.','127.0.0.1']
 

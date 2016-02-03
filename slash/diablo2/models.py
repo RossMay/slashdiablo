@@ -33,6 +33,7 @@ class Account(models.Model):
 			("diablo2.character_sync", 	"Can resync Diablo 2 characters"),
 			("diablo2.character_sync_all", 	"Can resync all Diablo 2 characters at once"),
 			("diablo2.moderation_enabled", 	"Can access moderation tools"),
+			("diablo2.log_parse", 		"Can parse the gameserver logs"),
 		)
 
 	def __unicode__(self):
@@ -66,3 +67,48 @@ class Character(models.Model):
 
 	def __unicode__(self):
 		return self.name
+
+
+class FailedLog(models.Model):
+	message = models.CharField(blank=False,null=False,max_length=255,help_text='Log message')
+
+	class Meta:
+		verbose_name = "Failed Log"
+
+	def __unicode__(self):
+		return self.message
+
+class GameserverLog(models.Model):
+	TYPE = (
+		('D2CSCreateEmptyGame','Create Game'),
+		('D2GSCBEnterGame','Join Game'),
+		('D2GSCBLeaveGame','Leave Game'),
+	)
+
+	date = models.DateTimeField(blank=False,null=False,help_text='Date and time the log entry was generated')
+	type = models.CharField(blank=False,null=False,choices=TYPE,max_length=25,help_text='Log type')
+
+	ip = models.CharField(blank=True,null=True,max_length=16,help_text='Player IP address')
+	character = models.ForeignKey(Character,blank=True,null=True,help_text="Link to Diablo2 character")
+	character_name = models.CharField(blank=True,null=True,max_length=40,help_text='Diablo2 character name')
+	account = models.ForeignKey(Account,blank=True,null=True,help_text="Link to Diablo2 account")
+	account_name = models.CharField(blank=True,null=True,max_length=40,help_text='Diablo2 account name')
+
+	game_id = models.IntegerField(blank=True,null=True,default=0,help_text='Game ID')
+	name = models.CharField(blank=True,null=True,max_length=40,help_text='Game name')
+	password = models.CharField(blank=True,null=True,max_length=40,help_text='Game password')
+	description = models.CharField(blank=True,null=True,max_length=75,help_text='Game Description')
+
+	ladder = models.BooleanField(default=False,help_text='Game is ladder')
+	difficulty = models.CharField(blank=True,null=True,max_length=10,help_text='Game Difficulty')
+	hardcore = models.BooleanField(default=False,help_text='Game is hardcore')
+	expansion = models.BooleanField(default=True,help_text='Game is expansion')
+
+	cclass = models.CharField(blank=True,null=True,max_length=10,help_text='Character class')
+	level = models.IntegerField(blank=True,null=True,default=1,help_text='Character Level')
+
+	class Meta:
+		verbose_name = "Gameserver Log"
+
+	def __unicode__(self):
+		return self.type

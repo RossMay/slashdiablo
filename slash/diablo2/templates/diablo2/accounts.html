@@ -42,8 +42,8 @@
 									<td class=" ">{{ account.email }}</td>
 									<td class=" ">{{ account.characters }}</td>
 									<td class=" ">{{ account.get_status_display }}</td>
-									<td class=" ">{{ account.lastlogin }}</td>
-									<td class=" last">{{ account.last_update }}</td>
+									<td class=" "><span style="display:none;">{{ account.lastlogin|date:"Y/m/d H:i" }}</span>{{ account.lastlogin }}</td>
+									<td class=" last"><span style="display:none;">{{ account.last_update|date:"Y/m/d H:i" }}</span>{{ account.last_update }}</td>
 								</tr>
 								{% endfor %}
 							</tbody>
