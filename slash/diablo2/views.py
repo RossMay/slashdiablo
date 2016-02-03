@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from .models import Account,Character,FailedLog,GameserverLog
 
-import MySQLdb,pytz,os,json,datetime,re
+import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess
 
 #ssh slash@gs.slashdiablo.net 'cmd /c echo|set /p=>c:\D2GS\Testlog.log'
 
@@ -214,12 +214,16 @@ def sync_character_all():
 
 	return True
 
-@permission_required('diablo2.log_parse')
+@permission_required('diablo2.logs_parse')
 def update_logs(request):
-	parse_log("/srv/slashdiablo/www/logs/d2gs.log")
+	logs_sync()
 	return HttpResponse("Done")
 
-def parse_log(file):
+def logs_parse_all():
+	for log in os.listdir("/srv/slashdiablo/www/logs/"):
+		if log.endswith('.log'):
+			logs_parse("/srv/slashdiablo/www/logs/%s" % log)
+def logs_parse(file,remove=False):
 	ignored = []
 	prev_created_game = {'parsed':{},'message':''}
 	with open(file,'r') as f:
@@ -270,7 +274,7 @@ def parse_log(file):
 			today = datetime.date.today() 
 			dt = datetime.datetime.strptime("%s/%s %s" % (event['date'], today.year if int(event['date'].split('/')[0]) <= today.month else today.year - 1,event['time'].split('.')[0]), "%m/%d/%Y %H:%M:%S")
 
-			GameserverLog(	date = dt,
+			GameserverLog(	date = timezone.make_aware(dt,pytz.timezone('UTC')),
 					type = log['type'],
 			
 					ip = log.get('ip',None),
@@ -291,4 +295,31 @@ def parse_log(file):
 			
 					cclass = log.get('cclass','Unknown'),
 					level = int(log.get('level',0))).save()
+	if remove:
+		os.remove(file)
 					
+def sftp_progress(done,total):
+	print "%s/%s %s%%\r" % (done, total,int((done/float(total))*100)),
+
+def logs_sync():
+	with pysftp.Connection('74.91.124.236',username='slash',private_key='/home/slashdiablo/.ssh/id_rsa') as sftp:
+		with sftp.cd('log'):
+			for dir in sftp.listdir():
+				if (not sftp.isdir(dir) and not dir.find('.log')) or dir == "Parsed":
+					continue
+				if sftp.isdir(dir):
+					file = "%s\\d2gs.log" % dir
+				else:
+					file = dir
+				sftp.get('%s' % file,localpath='/srv/slashdiablo/www/logs/%s-d2gs.log' % dir,callback=sftp_progress,preserve_mtime=True)
+				logs_parse('/srv/slashdiablo/www/logs/%s-d2gs.log' % dir,remove=True)
+				subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\'" % dir, shell=True)
+
+		if sftp.isfile('d2gs.log'):
+			dt = datetime.datetime.now()
+			fname = datetime.datetime.now().strftime("%Y-%m-%d--%H.%M-d2gs.log")
+			subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c copy C:\\D2GS\\d2gs.log C:\\D2GS\\log\\%s'" % fname, shell=True)
+			subprocess.call("ssh slash@gs.slashdiablo.net 'powershell -inputformat none -command \"& {Clear-Content C:\D2GS\d2gs.log}\"'", shell=True)
+			sftp.get('log/%s' % fname,localpath='/srv/slashdiablo/www/logs/%s' % fname,callback=sftp_progress,preserve_mtime=True)
+			subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\%s'" % (fname,fname), shell=True)
+		
