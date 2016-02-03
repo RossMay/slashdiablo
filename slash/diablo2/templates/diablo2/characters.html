@@ -45,7 +45,7 @@
 									<td class=" ">{{ char.level }}</td>
 									<td class=" ">{{ char.get_cclass_display }}</td>
 									<td class=" ">{% if char.hardcore %}HC{% else %}SC{% endif %}{% if char.expansion %}XP{% else %}CL{% endif %}</td>
-									<td class=" "><i class="fa {% if char.hardcore and char.has_died %}fa-heart-0{% else %}fa-heart{% endif %}"></i></td>
+									<td class=" "><i class="fa {% if char.hardcore and char.has_died %}fa-heart-o{% else %}fa-heart{% endif %}"></i></td>
 									<td class=" "><span style="display:none;">{{ char.created|date:"Y/m/d H:i" }}</span>{{ char.created }}</td>
 									<td class=" last"><span style="display:none;">{{ char.last_update|date:"Y/m/d H:i" }}</span>{{ char.last_update }}</td>
 								</tr>
