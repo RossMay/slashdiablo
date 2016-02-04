@@ -216,9 +216,9 @@ def sync_character_all():
 
 	return True
 
-@permission_required('diablo2.logs_parse')
+@permission_required('diablo2.update_logs')
 def update_logs(request):
-	tasks.logs_sync.delay()
+#	tasks.logs_sync.delay()
 	return HttpResponse("Sent to process")
 
 def logs_parse_all():

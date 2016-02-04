@@ -6343,3 +6343,12 @@ ul.notifications {
     float: right;
     opacity: 1;
 }
+
+
+.panel_toolbox>li.right-tool{
+	float:right;
+}
+
+div.col-md-12-main{
+	float:none;
+}

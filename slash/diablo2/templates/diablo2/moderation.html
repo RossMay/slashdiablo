@@ -3,33 +3,262 @@
 {% block title %}Slash Gaming - Diablo2{% endblock %}
 
 {% block content %}
-		<div class="">
-                    <div class="page-title">
-                        <div class="title_left">
-                            <h3>Diablo2 <small>Moderation</small></h3>
-                        </div>
-                    </div>
-                    <div class="clearfix"></div>
-                  <div class="row">
-                        <div class="col-md-12">
-                            <div class="x_panel">
-                                <div class="x_title">
-                                    <h2>Moderation Tools</h2>
-                                    <ul class="nav navbar-right panel_toolbox">
-                                        <li><a href="#"><i class="fa fa-chevron-up"></i></a>
-                                        </li>
-                                        <li><a href="#"><i class="fa fa-close"></i></a>
-                                        </li>
-                                    </ul>
-                                    <div class="clearfix"></div>
-                                </div>
-                                <div class="x_content">
+	<div class="col-md-12 col-md-12-main">
+		<div class="x_panel">
+			<div class="x_title">
+				<h2><i class="fa fa-search"></i> Investigate <small>Search logs and database</small></h2>
+				<ul class="nav navbar-right panel_toolbox">
+                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                </ul>
+				<div class="clearfix"></div>
+			</div>
+			<div class="x_content">
+				<div class="col-xs-3">
+					<ul class="nav nav-tabs tabs-left">
+						<li class="active"><a href="#i-db-tab" data-toggle="tab">Database</a></li>
+						<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>
+						<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>
+						<li><a href="#i-acct-tab" data-toggle="tab">Account</a></li>
+						<li><a href="#i-char-tab" data-toggle="tab">Character</a></li>
+					</ul>
+				</div>
+				<div class="col-xs-9">
+					<div class="tab-content">
+						<div class="tab-pane active" id="i-db-tab">
+							<p class="lead">Database</p>
+							<p>
+								Lookup things from the database like last login email, time, email address, accounts via name
+							</p>
+						</div>
+						<div class="tab-pane" id="i-log-tab">
+							<p class="lead">Log</p>
+							<p>
+								Lookup things from the GS log like game list, ip addresses
+							</p>
+						</div>
+						<div class="tab-pane" id="i-report-tab">
+							<p class="lead">Report</p>
+							<p>
+								Generate reports on a user account
+							</p>
+						</div>
+						<div class="tab-pane" id="i-acct-tab">
+							<p class="lead">Account</p>
+							<p>
+								Lookup based on the imported accounts model
+							</p>
+						</div>
+						<div class="tab-pane" id="i-char-tab">
+							<p class="lead">Character</p>
+							<p>
+								Lookup based on the imported character model
+							</p>
+						</div>
+					</div>
+				</div>
+				<div class="clearfix"></div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-12 col-md-12-main">
+		<div class="x_panel">
+			<div class="x_title">
+				<h2><i class="fa fa-rocket"></i> Actions <small>Take action against accounts</small></h2>
+				<ul class="nav navbar-right panel_toolbox">
+                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                </ul>
+				<div class="clearfix"></div>
+			</div>
+			<div class="x_content">
+				<div class="col-xs-3">
+					<ul class="nav nav-tabs tabs-left">
+						<li class="active"><a href="#a-lock-tab" data-toggle="tab">Lock Account</a></li>
+						<li><a href="#a-unlock-tab" data-toggle="tab">Unlock Account</a></li>
+						<li><a href="#a-ban-tab" data-toggle="tab">Ban IP</a></li>
+						<li><a href="#a-unban-tab" data-toggle="tab">Unban IP</a></li>
+						<li><a href="#a-kick-tab" data-toggle="tab">Kick</a></li>
+						<li><a href="#a-ann-tab" data-toggle="tab">Announce</a></li>
+						<li><a href="#a-chpass-tab" data-toggle="tab">Change Password</a></li>
+					</ul>
+				</div>
+				<div class="col-xs-9">
+					<div class="tab-content">
+						<div class="tab-pane active" id="a-lock-tab">
+							<p class="lead">Lock Account</p>
+							<p>
+								Set accounts to be locked
+							</p>
+						</div>
+						<div class="tab-pane" id="a-unlock-tab">
+							<p class="lead">Unlock Account</p>
+							<p>
+								Remove locked status from accounts
+							</p>
+						</div>
+						<div class="tab-pane" id="a-ban-tab">
+							<p class="lead">Ban IP</p>
+							<p>
+								Add an IP to the ban list
+							</p>
+						</div>
+						<div class="tab-pane" id="a-unban-tab">
+							<p class="lead">Unban IP</p>
+							<p>
+								Remove an IP from the ban list
+							</p>
+						</div>
+						<div class="tab-pane" id="a-kick-tab">
+							<p class="lead">Kick</p>
+							<p>
+								Kick an account from the GS and BNET
+							</p>
+						</div>
+						<div class="tab-pane" id="a-ann-tab">
+							<p class="lead">Announce</p>
+							<p>
+								Send an announcement through the gameserver, maybe BNET
+							</p>
+						</div>
+						<div class="tab-pane" id="a-motd-tab">
+							<p class="lead">Set MOTD</p>
+							<p>
+								Set the gameserver MOTD
+							</p>
+						</div>
+						<div class="tab-pane" id="a-chpass-tab">
+							<p class="lead">Change Password</p>
+							<p>
+								Change account passwords
+							</p>
+						</div>
+					</div>
+				</div>
+				<div class="clearfix"></div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-12 col-md-12-main">
+		<div class="x_panel">
+			<div class="x_title">
+				<h2><i class="fa fa-gamepad"></i> Active Games <small>Information about the current active games</small></h2>
+				<ul class="nav navbar-right panel_toolbox">
+                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                </ul>
+				<div class="clearfix"></div>
+			</div>
+			<div class="x_content">
+				<div class="col-xs-3">
+					<ul class="nav nav-tabs tabs-left">
+						<li class="active"><a href="#g-list-tab" data-toggle="tab">Game List</a></li>
+						<li><a href="#g-detail-tab" data-toggle="tab">Game Details</a></li>
+					</ul>
+				</div>
+				<div class="col-xs-9">
+					<div class="tab-content">
+						<div class="tab-pane active" id="g-list-tab">
+							<p class="lead">Game List</p>
+							<p>
+								List of games taken from telnet (GL)
+							</p>
+						</div>
+						<div class="tab-pane" id="g-detail-tab">
+							<p class="lead">Game Details</p>
+							<p>
+								Details of game taken from telnet (CL)
+							</p>
 
+						</div>
+					</div>
+				</div>
+				<div class="clearfix"></div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-12 col-md-12-main">
+		<div class="x_panel">
+			<div class="x_title">
+				<h2><i class="fa fa-history"></i> History <small>View logs and previous reports</small></h2>
+				<ul class="nav navbar-right panel_toolbox">
+                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                </ul>
+				<div class="clearfix"></div>
+			</div>
+			<div class="x_content">
+				<div class="col-xs-3">
+					<ul class="nav nav-tabs tabs-left">
+						<li class="active"><a href="#h-gs-tab" data-toggle="tab">Gameserver Log</a></li>
+						<li><a href="#h-report-tab" data-toggle="tab">Reports</a></li>
+						<li><a href="#h-lookup-tab" data-toggle="tab">Lookups</a></li>
+						<li><a href="#h-action-tab" data-toggle="tab">Action</a></li>
+					</ul>
+				</div>
+				<div class="col-xs-9">
+					<div class="tab-content">
+						<div class="tab-pane active" id="h-gs-tab">
+							<p class="lead">Gamserver Log</p>
+							<p>
+								Gameserver log
+							</p>
+						</div>
+						<div class="tab-pane" id="h-report-tab">
+							<p class="lead">Reports</p>
+							<p>
+								Previously run reports
+							</p>
+						</div>
+						<div class="tab-pane" id="h-lookup-tab">
+							<p class="lead">Lookups</p>
+							<p>
+								Previous results of lookups
+							</p>
+						</div>
+						<div class="tab-pane" id="h-action-tab">
+							<p class="lead">Action</p>
+							<p>
+								List of previous preformed actions by mods
+							</p>
+						</div>
+					</div>
+				</div>
+				<div class="clearfix"></div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-12 col-md-12-main">
+		<div class="x_panel">
+			<div class="x_title">
+				<h2><i class="fa fa-laptop"></i> System <small>Controls for PVPGN and D2GS</small></h2>
+				<ul class="nav navbar-right panel_toolbox">
+                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                </ul>
+				<div class="clearfix"></div>
+			</div>
+			<div class="x_content">
+				<div class="col-xs-3">
+					<ul class="nav nav-tabs tabs-left">
+						<li class="active"><a href="#sy-d2gs-tab" data-toggle="tab">D2GS</a></li>
+						<li><a href="#sy-pvpgn-tab" data-toggle="tab">PVPGN</a></li>
+					</ul>
+				</div>
+				<div class="col-xs-9">
+					<div class="tab-content">
+						<div class="tab-pane active" id="sy-d2gs-tab">
+							<p class="lead">D2GS Gameserver</p>
+							<p>
+								Start, stop and restart the gameserver
+							</p>
+						</div>
+						<div class="tab-pane" id="sy-pvpgn-tab">
+							<p class="lead">PVPGN Bnet Server</p>
+							<p>
+								Start, stop and restart the pvpgn processes
+							</p>
 
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-	
+						</div>
+					</div>
+				</div>
+				<div class="clearfix"></div>
+			</div>
+		</div>
+	</div>
 {% endblock %}
