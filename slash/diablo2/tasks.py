@@ -5,10 +5,13 @@ from django.utils import timezone
 
 from .models import FailedLog,GameserverLog
 
+from base.models import Variable
+
 import pytz,os,datetime,re,pysftp,subprocess
 
 from celery import shared_task
 
+import json
 
 @shared_task
 def logs_parse(file,remove=False):
@@ -109,10 +112,12 @@ def logs_parse(file,remove=False):
 		os.remove(file)
 					
 def sftp_progress(done,total):
+	if not total:
+		return
 	print "%s/%s %s%%\r" % (done, total,int((done/float(total))*100)),
 
 @shared_task
-def logs_sync():
+def logs_sync(username='Unknown'):
 	with pysftp.Connection('74.91.124.236',username='slash',private_key='/home/slashdiablo/.ssh/id_rsa') as sftp:
 		with sftp.cd('log'):
 			for dir in sftp.listdir():
@@ -134,4 +139,10 @@ def logs_sync():
 			sftp.get('log/%s' % fname,localpath='/srv/slashdiablo/www/logs/%s' % fname,callback=sftp_progress,preserve_mtime=True)
 			logs_parse.delay('/srv/slashdiablo/www/logs/%s' % fname,remove=True)
 			subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\%s'" % (fname,fname), shell=True)
+
+	
 		
+		variable = Variable.objects.get(name='diablo2_log_sync_time')
+		variable.value = datetime.datetime.now()
+		variable.json = json.dumps({'user': username})
+		variable.save()

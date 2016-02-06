@@ -2,6 +2,93 @@
 
 {% block title %}Slash Gaming - Diablo2{% endblock %}
 
+{% block extra-scripts %}
+	<script>
+		$(document).ready(function(){
+
+			{% if perms.diablo2.moderation_investigate %}
+			{% if perms.diablo2.log_sync %}
+			//Sync Logs
+			$('#log_sync').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/log_sync/",
+				}).done(function(message){
+					if (message.success){
+						$('#log_sync_time').html(message.message);
+					}else{
+						new PNotify({
+							title: 'Warning',
+							text: message.message
+						});
+					}
+				});
+			});
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_database %}
+			$('.db-search').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'database',
+						target: $(this).attr('name'),
+						terms: $('#db_search_query').val()
+					}
+				}).done(function(message){
+					if (message.success){
+						results = $('<div class="row">'+
+								'<div class="col-md-12">'+
+									'<div class="x_panel">'+
+										'<div class="x_title">'+
+											'<h2>'+message.count + ' Results<small>' + message.query+'</small></h2>'+
+											//'<ul class="nav navbar-right panel_toolbox">'+
+							                                //        '<li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>'+
+							              		        //        '</ul>'+
+											'<div class="clearfix"></div>'+
+										'</div>'+
+										'<div class="x_content">'+
+											message.result+
+										'</div>'+
+									'</div>'+
+								'</div>',+
+							'</div>');
+
+
+						$('#db-search-results').prepend(results);
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_logs %}
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_report %}
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_account %}
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_character %}
+			{% endif %}
+			{% endif %}
+		});
+	</script>
+{% endblock %}
+
 {% block content %}
         <div class="">
                 <div class="page-title">
@@ -10,11 +97,12 @@
                         </div>
                 </div>
                 <div class="clearfix"></div>
+		{% if perms.diablo2.moderation_investigate %}
                 <div class="row">
 			<div class="col-md-12">
 				<div class="x_panel">
 					<div class="x_title">
-						<h2><i class="fa fa-search"></i> Investigate <small>Search logs and database</small></h2>
+						<h2><i class="fa fa-search"></i> Investigate <small>Searching and reporting</small></h2>
 						<ul class="nav navbar-right panel_toolbox">
 		                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
                 		                </ul>
@@ -23,45 +111,76 @@
 					<div class="x_content">
 						<div class="col-xs-3">
 							<ul class="nav nav-tabs tabs-left">
-								<li class="active"><a href="#i-db-tab" data-toggle="tab">Database</a></li>
-								<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>
-								<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>
-								<li><a href="#i-acct-tab" data-toggle="tab">Account</a></li>
-								<li><a href="#i-char-tab" data-toggle="tab">Character</a></li>
+								<li class="active"><a href="#i-sync-tab" data-toggle="tab">Sync Log</a></li>
+								{% if perms.diablo2.moderation_investigate_database %}<li><a href="#i-db-tab" data-toggle="tab">Database</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_logs %}<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_report %}<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_account %}<li><a href="#i-acct-tab" data-toggle="tab">Account</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_character %}<li><a href="#i-char-tab" data-toggle="tab">Character</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-9">
 							<div class="tab-content">
-								<div class="tab-pane active" id="i-db-tab">
-									<p class="lead">Database</p>
-									<p>
-										Lookup things from the database like last login email, time, email address, accounts via name
-									</p>
+								<div class="tab-pane active" id="i-sync-tab">
+									<div class="col-md-12">
+										<p class="lead">Sync Gameserver Logs</p>
+										<p id="log_sync_time">Log was last synced and parsed <strong id="sync_mins">{{ log_sync_mins }}</strong> minutes ago at <strong id="sync_time">{{ log_sync_time }}</strong> by <strong id="sync_user">{{ log_sync_user }}</strong>.</p>	
+										{% if perms.diablo2.log_sync %}<a id='log_sync' class="btn btn-primary" href='#'>Sync Now</a>{% endif %}
+									</div>
 								</div>
+								{% if perms.diablo2.moderation_investigate_database %}
+								<div class="tab-pane" id="i-db-tab">
+									<div id='db-search-pane' class="col-md-12">
+										<p class="lead">Database Search</p>
+										<p>Search the PVPGN Database for accounts.</p>
+				                                                <div class="input-group">
+											<input id='db_search_query' type="text" class="form-control" aria-label="Database search query">
+											<div class="input-group-btn">
+												<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">Search <span class="caret"></span></button>
+												<ul class="dropdown-menu dropdown-menu-right" role="menu">
+													<li><a class='db-search' name='account' href="#">Account Name</a></li>
+													<li><a class='db-search' name='email' href="#">Email Address</a></li>
+													<li><a class='db-search' name='ip' href="#">Last IP</a></li>
+													{% if perms.diablo2.moderation_investigate_database_password %}<li><a class='db-search' name='password' href="#">Matching Password</a></li>{% endif %}
+												</ul>
+											</div>
+										</div>
+										<div id="db-search-results"></div>
+                                        				</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_logs %}
 								<div class="tab-pane" id="i-log-tab">
 									<p class="lead">Log</p>
 									<p>
 										Lookup things from the GS log like game list, ip addresses
 									</p>
 								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_report %}
 								<div class="tab-pane" id="i-report-tab">
 									<p class="lead">Report</p>
 									<p>
 										Generate reports on a user account
 									</p>
 								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_account %}
 								<div class="tab-pane" id="i-acct-tab">
 									<p class="lead">Account</p>
 									<p>
 										Lookup based on the imported accounts model
 									</p>
 								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_character %}
 								<div class="tab-pane" id="i-char-tab">
 									<p class="lead">Character</p>
 									<p>
 										Lookup based on the imported character model
 									</p>	
 								</div>
+								{% endif %}
 							</div>
 						</div>
 						<div class="clearfix"></div>
@@ -69,6 +188,8 @@
 				</div>
 			</div>
 		</div>
+		{% endif %}
+		{% if perms.diablo2.moderation_action %}
                 <div class="row">
 			<div class="col-md-12">
 				<div class="x_panel">
@@ -148,6 +269,8 @@
 				</div>
 			</div>
 		</div>
+		{% endif %}
+		{% if perms.diablo2.moderation_gamelist %}
                 <div class="row">
 			<div class="col-md-12">
 				<div class="x_panel">
@@ -186,6 +309,8 @@
 				</div>	
 			</div>	
 		</div>
+		{% endif %}
+		{% if perms.diablo2.moderation_history %}
                 <div class="row">
 			<div class="col-md-12">
 				<div class="x_panel">
@@ -238,6 +363,8 @@
 				</div>
 			</div>	
 		</div>
+		{% endif %}
+		{% if perms.diablo2.moderation_system %}
                 <div class="row">
 			<div class="col-md-12">
 				<div class="x_panel">
@@ -251,13 +378,20 @@
 					<div class="x_content">
 						<div class="col-xs-3">
 							<ul class="nav nav-tabs tabs-left">
-								<li class="active"><a href="#sy-d2gs-tab" data-toggle="tab">D2GS</a></li>
+								<li class="active"><a href="#sy-status-tab" data-toggle="tab">Status</a></li>
+								<li><a href="#sy-d2gs-tab" data-toggle="tab">D2GS</a></li>
 								<li><a href="#sy-pvpgn-tab" data-toggle="tab">PVPGN</a></li>
 							</ul>
 						</div>
 						<div class="col-xs-9">
 							<div class="tab-content">
-								<div class="tab-pane active" id="sy-d2gs-tab">
+								<div class="tab-pane active" id="sy-status-tab">
+									<p class="lead">System Status</p>
+									<p>
+										View the status of the servers
+									</p>
+								</div>
+								<div class="tab-pane" id="sy-d2gs-tab">
 									<p class="lead">D2GS Gameserver</p>
 									<p>
 										Start, stop and restart the gameserver
@@ -277,6 +411,7 @@
 				</div>
 			</div>
 		</div>
+		{% endif %}
 	</div>
 
 {% endblock %}

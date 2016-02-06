@@ -28,26 +28,27 @@ class Account(models.Model):
 	class Meta:
 		verbose_name = "Account"
 		permissions = (
-			("account_sync", 			"Can resync Diablo 2 accounts"),
-			("account_sync_all", 			"Can resync all Diablo 2 accounts at once"),
-			("character_sync", 			"Can resync Diablo 2 characters"),
-			("character_sync_all", 			"Can resync all Diablo 2 characters at once"),
-			("moderation_enabled", 			"Can access moderation tools"),
-			("log_sync", 				"Can sync the gameserver logs"),
-			("log_parse", 				"Can parse the gameserver logs"),
-			("moderation_investigate", 		"Can access the investigate section"),
-			("moderation_action", 			"Can access the actions section"),
-			("moderation_gamelist", 		"Can access the game info section"),
-			("moderation_history", 			"Can access the history section"),
-			("moderation_system", 			"Can access the system secton"),
-			("moderation_investigate_database", 	"Can investigate using the database"),
-			("moderation_investigate_logs", 	"Can investigate using the logs"),
-			("moderation_investigate_report", 	"Can generate reports"),
-			("moderation_investigate_account", 	"Can investigate via account model "),
-			("moderation_investigate_character", 	"Can investigate via character model"),
-			("moderation_action_lock", 		"Can preform account lock"),
-			("moderation_action_unlock", 		"Can preform account unlock"),
-			("moderation_action_ban", 		"Can preform ip ban"),
+			("account_sync", 				"Can resync Diablo 2 accounts"),
+			("account_sync_all", 				"Can resync all Diablo 2 accounts at once"),
+			("character_sync", 				"Can resync Diablo 2 characters"),
+			("character_sync_all", 				"Can resync all Diablo 2 characters at once"),
+			("moderation_enabled", 				"Can access moderation tools"),
+			("log_sync", 					"Can sync the gameserver logs"),
+			("log_parse", 					"Can parse the gameserver logs"),
+			("moderation_investigate", 			"Can access the investigate section"),
+			("moderation_action", 				"Can access the actions section"),
+			("moderation_gamelist", 			"Can access the game info section"),
+			("moderation_history", 				"Can access the history section"),
+			("moderation_system", 				"Can access the system secton"),
+			("moderation_investigate_database", 		"Can investigate using the database"),
+			("moderation_investigate_database_password", 	"Can investigate using the database and lookup matching passwords"),
+			("moderation_investigate_logs", 		"Can investigate using the logs"),
+			("moderation_investigate_report", 		"Can generate reports"),
+			("moderation_investigate_account", 		"Can investigate via account model "),
+			("moderation_investigate_character", 		"Can investigate via character model"),
+			("moderation_action_lock", 			"Can preform account lock"),
+			("moderation_action_unlock", 			"Can preform account unlock"),
+			("moderation_action_ban", 			"Can preform ip ban"),
 			("moderation_action_unban", 		"Can preform ip unban"),
 			("moderation_action_kick", 		"Can preform kick"),
 			("moderation_action_announce", 		"Can preform announcement"),
@@ -145,3 +146,17 @@ class GameserverLog(models.Model):
 
 	def __unicode__(self):
 		return self.type
+
+class LookupLog(models.Model):
+	user = models.ForeignKey(User,blank=False,null=False,help_text='User who ran the query')
+	type = models.CharField(blank=False,null=False,max_length=20,help_text='Type of lookup')
+	target = models.CharField(blank=False,null=False,max_length=20,help_text='Target of lookup')
+	query = models.CharField(blank=False,null=False,max_length=255,help_text='User provided query')
+	parsed_query = models.CharField(blank=False,null=False,max_length=255,help_text='Actual query run')
+	results = models.IntegerField(help_text='Number of results')
+
+	class Meta:
+		verbose_name = "Lookup Log"
+
+	def __unicode__(self):
+		return "%s - %s" % (self.user,self.parsed_query)

@@ -3,7 +3,8 @@ from django.conf.urls import url
 from . import views
 
 urlpatterns = [
-	url(r'^update_logs/?$', views.update_logs, name='update_logs'),
+	url(r'^moderation/search/?$', views.moderation_search, name='moderation_search'),
+	url(r'^log_sync/?$', views.log_sync, name='log_sync'),
 	url(r'^accounts/?$', views.accounts, name='accounts'),
 	url(r'^characters/?$', views.characters, name='characters'),
 	url(r'^moderation/?$', views.moderation, name='moderation'),

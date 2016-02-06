@@ -5,4 +5,4 @@ class Command(BaseCommand):
 	help = 'Sync the gameserver logs'
 
 	def handle(self, *args, **options):
-		logs_sync.delay()
+		logs_sync.delay(username="Command Line")

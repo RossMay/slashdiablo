@@ -1,15 +1,18 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required,permission_required
 from django.contrib.auth.models import User
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, Http404
 from django.conf import settings
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 
-from .models import Account,Character,FailedLog,GameserverLog
+from .models import Account,Character,FailedLog,GameserverLog,LookupLog
+
+from base.models import Variable
 
 from . import tasks
 
-import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess
+import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess,random
 
 #ssh slash@gs.slashdiablo.net 'cmd /c echo|set /p=>c:\D2GS\Testlog.log'
 
@@ -29,8 +32,18 @@ def characters(request):
 	return render(request,'diablo2/characters.html',{'characters':characters})
 
 @permission_required('diablo2.moderation_enabled')
+@ensure_csrf_cookie
 def moderation(request):
-	return render(request,'diablo2/moderation.html',{})
+	context = {}
+
+	#GS Log Syncing
+	last_sync = Variable.objects.get(name='diablo2_log_sync_time')
+	context['log_sync_time'] = datetime.datetime.strptime(last_sync.value,'%Y-%m-%d %H:%M:%S.%f')
+	context['log_sync_mins'] = int((datetime.datetime.now() - context['log_sync_time']).seconds) / 60
+	context['log_sync_user'] = json.loads(last_sync.json).get('user','Unknown')
+
+
+	return render(request,'diablo2/moderation.html',context)
 
 def account_sync(query):
 	db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
@@ -216,13 +229,135 @@ def sync_character_all():
 
 	return True
 
-@permission_required('diablo2.update_logs')
-def update_logs(request):
-#	tasks.logs_sync.delay()
-	return HttpResponse("Sent to process")
+@permission_required('diablo2.log_sync')
+def log_sync(request):
+	variable = Variable.objects.get(name='diablo2_log_sync_time')
+	last_update = datetime.datetime.strptime(variable.value,'%Y-%m-%d %H:%M:%S.%f')
+	minutes = int((datetime.datetime.now() - last_update).seconds) / 60
+	print minutes
+	if minutes > 5:
+		variable = Variable.objects.get(name='diablo2_log_sync_time')
+		variable.value = datetime.datetime.now()
+		variable.json = json.dumps({'user': request.user.username})
+		variable.save()
+		tasks.logs_sync.delay(username=request.user.username)
+		return JsonResponse({'success': True, 'message': 'Log sync was sent to queue'})
+	return JsonResponse({'success':False, 'message': 'Please wait, the log was synced %s minutes ago by %s' % (int(minutes),json.loads(variable.json).get('user','Unknown'))})
 
 def logs_parse_all():
 	for log in os.listdir("/srv/slashdiablo/www/logs/"):
 		if log.endswith('.log'):
 			tasks.logs_parse("/srv/slashdiablo/www/logs/%s" % log)
 
+
+@permission_required('diablo2.moderation_enabled')
+def moderation_search(request):
+	if request.method == 'POST':
+		action = request.POST.get('action',False)
+		if action == 'search':
+			source = request.POST.get('source',False)
+			if source == 'database':
+				if not request.user.has_perm('diablo2.moderation_investigate_database'):
+					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+				target = request.POST.get('target',False)
+				terms = request.POST.get('terms',False)
+
+				if not terms or not len(terms):
+					return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
+
+				if not target in ['ip','email','account','password']:
+					return JsonResponse({'success':False,'message':'Invalid target for database search', 'type': 'error', 'title': 'Error'})
+
+				parsed_terms = re.sub('[^\w_\-@\.\*]','',terms)
+				if not parsed_terms or not len(parsed_terms) or not len(parsed_terms.replace('*','')):
+					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
+
+				
+				if target == 'password':
+					if not request.user.has_perm('diablo2.moderation_investigate_database_password'):
+						return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+					query = 'acct_passhash1 = (SELECT acct_passhash1 from BNET where acct_username = \'%s\');' % parsed_terms.replace('*','%')
+				else:
+					target_map = { 'account': 'acct_username', 'email': 'acct_email', 'ip': 'acct_lastlogin_ip'}
+					query = '%s like \'%s\';' % (target_map[target], parsed_terms.replace('*','%'))
+
+				short_query = '%s = %s' % (target_map[target],parsed_terms)
+
+				log = LookupLog(user=request.user,type=source,target=target_map[target],query=terms,parsed_query=query,results=0)
+				log.save()
+				
+				db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
+				cur = db.cursor()
+				cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where %s" % query)
+
+
+				results = ''
+				count = 0
+
+				for row in cur.fetchall():
+					if not row[0]:
+						continue
+					entry = {
+						'name': row[0],
+						'email': row[1],
+						'id': row[2],
+						'admin': True if row[3].lower() == "true" else False,
+						'operator': True if row[4].lower() == "true" else False,
+						'locked': True if row[5].lower() == "true" else False,
+						'commandgroups': row[6],
+						'time': datetime.datetime.fromtimestamp(row[7]),
+						'ip': row[8],
+					}
+
+					results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+								entry['name'],
+								entry['email'],
+								entry['id'],
+								entry['admin'],
+								entry['operator'],
+								entry['locked'],
+								entry['commandgroups'],
+								entry['time'],
+								entry['ip']
+							)
+					count = count +1
+				db.close()
+
+				if results == '':
+					results = '<tr><td colspan=9>No Results</td></tr>'
+
+				result = '''	<table class='table table-bordered'>
+							<thead>
+								<tr>
+									<th>Account</th>
+									<th>Email</th>
+									<th>User ID</th>
+									<th>Admin</th>
+									<th>Operator</th>
+									<th>Locked</th>
+									<th>Command Groups</th>
+									<th>Last Login</th>
+									<th>Last IP</th>
+								</tr>
+							</thead>
+							<tbody>
+								%s
+							</tbody>
+						</table>
+					''' % results
+
+				log.results = count
+				log.save()
+
+				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': count})
+			elif source == 'logs':
+				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Logs'})
+			elif source == 'report':
+				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Report'})
+			elif source == 'account':
+				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Account'})
+			elif source == 'character':
+				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Character'})
+		return JsonResponse({'success': True})
+	else:
+		raise Http404
