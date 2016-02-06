@@ -76,6 +76,11 @@
 								<li>
 									<a href="/diablo2/premium/"><i class="fa fa-lock"></i> Slash Premium <span class="label label-primary pull-right">Unlock Now</span></a>
 								</li>
+								{% if request.user.is_superuser %}
+								<li>
+									<a href="/admin/"><i class="fa fa-gavel"></i> Admin </a>
+								</li>
+								{% endif %}
 							</ul>
 						</div>
 					</div>
