@@ -343,21 +343,248 @@ def moderation_search(request):
 							<tbody>
 								%s
 							</tbody>
-						</table>
-					''' % results
+						</table>''' % results
 
 				log.results = count
 				log.save()
 
 				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': count})
 			elif source == 'logs':
-				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Logs'})
+				if not request.user.has_perm('diablo2.moderation_investigate_logs'):
+					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+				target = request.POST.get('target',False)
+				terms = request.POST.get('terms',False)
+
+				if not terms or not len(terms):
+					return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
+
+				if not target in ['activity-ip','activity-account','activity-character','ip-account','ip-character','ip-ip','gamelist-ip','gamelist-account','gamelist-character','gameinfo','account-ip']:
+					return JsonResponse({'success':False,'message':'Invalid target for log search', 'type': 'error', 'title': 'Error'})
+
+				parsed_terms = re.sub('[^\w_\-\[\]\'\*\.]','',terms)
+				if not parsed_terms or not len(parsed_terms) or not len(parsed_terms.replace('*','')):
+					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
+
+				log = LookupLog(user=request.user,type=source,target=target,query=terms,parsed_query=parsed_terms,results=0)
+				log.save()
+
+				if target == 'gameinfo':
+
+					short_query = "Gameinfo where gamename = %s" % terms
+					entries = GameserverLog.objects.filter(name=parsed_terms).order_by('-date')
+
+					results = ''
+					count = 0
+					for entry in entries:
+						results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+								datetime.datetime.strftime(entry.date,'%b %d %H:%M:%S'),
+								entry.name,
+								entry.password,
+								entry.get_type_display().replace(' Game',''),
+								entry.account_name,
+								entry.character_name,
+								entry.ip if entry.ip else '',
+								entry.game_id,
+								entry.cclass if not entry.cclass == "Unknown" else '',
+								entry.level if entry.level else '',
+								entry.difficulty.capitalize(),
+							)
+						count = count + 1
+
+					if not count:
+						results = '<tr><td colspan=8>No Results</td></tr>'
+
+					result = '''	<table class='table table-bordered'>
+								<thead>
+									<tr>
+										<th>Date</th>
+										<th>Game</th>
+										<th>Password</th>
+										<th>Event</th>
+										<th>Account</th>
+										<th>Character</th>
+										<th>IP</th>
+										<th>ID</th>
+										<th>Class</th>
+										<th>Level</th>
+										<th>Difficulty</th>
+									</tr>
+								</thead>
+								<tbody>
+									%s
+								</tbody>
+							</table>
+						''' % results
+
+					log.results = count
+					log.save()
+
+				else:
+					t,s = target.split('-')
+					if s == 'account':
+						entries = GameserverLog.objects.filter(account_name=parsed_terms).order_by('-date')
+					elif s == 'character':
+						entries = GameserverLog.objects.filter(character_name=parsed_terms).order_by('-date')
+					elif s == 'ip':
+						entries = GameserverLog.objects.filter(ip=parsed_terms).order_by('-date')
+					else:
+						return JsonResponse({'success':False,'message':'Invalid target for log search', 'type': 'error', 'title': 'Error'})
+
+					if t == 'activity':
+
+						short_query = "Activity where %s = %s" % (s,terms)
+
+						results = ''
+						count = 0
+						for entry in entries:
+							results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+									datetime.datetime.strftime(entry.date,'%b %d %H:%M:%S'),
+									entry.name,
+									entry.password,
+									entry.get_type_display().replace(' Game',''),
+									entry.account_name,
+									entry.character_name,
+									entry.ip if entry.ip else '',
+									entry.game_id,
+									entry.cclass if not entry.cclass == "Unknown" else '',
+									entry.level if entry.level else '',
+									entry.difficulty.capitalize(),
+								)
+							count = count + 1 
+	
+						if not count:
+							results = '<tr><td colspan=8>No Results</td></tr>'
+	
+						result = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th>Date</th>
+											<th>Game</th>
+											<th>Password</th>
+											<th>Event</th>
+											<th>Account</th>
+											<th>Character</th>
+											<th>IP</th>
+											<th>ID</th>
+											<th>Class</th>
+											<th>Level</th>
+											<th>Difficulty</th>
+										</tr>
+									</thead>
+									<tbody>
+										%s
+									</tbody>
+								</table>
+							''' % results
+	
+						log.results = count
+						log.save()
+
+					elif t == 'ip':
+
+						short_query = "IP List where %s = %s" % (s,terms)
+
+						results = ''
+						ips = []
+						for entry in entries:
+							if entry.ip and len(entry.ip) and not entry.ip in ips:
+								results = results + "%s%s" % ('<br/>' if len(results) else '',entry.ip)
+								ips.append(entry.ip)
+	
+						if not len(ips):
+							results = 'No Results'
+	
+						result = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th>IPs</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>
+										%s
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							''' % results
+	
+						log.results = len(ips)
+						log.save()
+					elif t == 'gamelist':
+
+						short_query = "Game List where %s = %s" % (s,terms)
+
+						results = ''
+						count = 0
+						for entry in entries:
+								if not entry.type == 'D2GSCBEnterGame':
+									continue
+								results = results + "%s%s" % ('<br/>' if len(results) else '',entry.name)
+								count = count + 1
+	
+						if not count:
+							results = 'No Results'
+	
+						result = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th>Games</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>
+										%s
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							''' % results
+	
+						log.results = count
+						log.save()
+					elif t == 'account':
+
+						short_query = "Account List where %s = %s" % (s,terms)
+
+						results = ''
+						accounts = []
+						for entry in entries:
+								if not entry.account_name or entry.account_name in accounts:
+									continue
+								results = results + "%s%s" % ('<br/>' if len(results) else '',entry.account_name)
+								accounts.append(entry.account_name)
+	
+						if not len(accounts):
+							results = 'No Results'
+	
+						result = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th>Accounts</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>
+										%s
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							''' % results
+	
+						log.results = len(accounts)
+						log.save()
+					else:
+						result = 'Not implemented'
+						short_query = '%s = %s' % (target,terms)
+
+				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': log.results})
 			elif source == 'report':
 				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Report'})
-			elif source == 'account':
-				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Account'})
-			elif source == 'character':
-				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Character'})
 		return JsonResponse({'success': True})
 	else:
 		raise Http404

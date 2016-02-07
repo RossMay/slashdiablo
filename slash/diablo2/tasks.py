@@ -11,7 +11,7 @@ import pytz,os,datetime,re,pysftp,subprocess
 
 from celery import shared_task
 
-import json
+import json, random
 
 @shared_task
 def logs_parse(file,remove=False):
@@ -38,14 +38,10 @@ def logs_parse(file,remove=False):
 								log['type'] = 'D2CSCreateEmptyGame'
 							else:
 								FailedLog(message="%s %s - Failed to merge \'D2CSCreateEmptyGame\' - %s - %s" % (event['date'],event['time'],event['message'].replace('\r',''),prev_created_game['message'])).save()
-								print "1 - Line - %s" % line
-								print "1 - Event - %s" % event
 								continue
 							
 						else:
 							FailedLog(message="Failed to parse \'D2CSCreateEmptyGame\' - %s" % event['message'].replace('\r','')).save()
-							print "2 - Line - %s" % line
-							print "2 - Event - %s" % event
 							continue
 	
 				elif event['type'] == 'D2GSCBEnterGame':
@@ -55,8 +51,6 @@ def logs_parse(file,remove=False):
 						log['type'] = 'D2GSCBEnterGame'
 					else:
 						FailedLog(message="Failed to parse \'D2GSCBEnterGame\' - %s" % event['message'].replace('\r','')).save()
-						print "3 - Line - %s" % line
-						print "3 - Event - %s" % event
 						continue
 	
 				elif event['type'] == 'D2GSCBLeaveGame':
@@ -70,8 +64,6 @@ def logs_parse(file,remove=False):
 						if re.match(r'phantom user .*',event['message'].replace('\r','')):
 							continue
 						FailedLog(message="Failed to parse \'D2GSCBLeaveGame\' - %s" % event['message'].replace('\r','')).save()
-						print "4 - Line - %s" % line
-						print "4 - Event - %s" % event
 						continue
 	
 				else:
@@ -90,7 +82,7 @@ def logs_parse(file,remove=False):
 					character = None,
 					character_name = log.get('character',None),
 					account = None,
-					account_name = log.get('account',None),
+					account_name = log.get('account','').replace('*',''),
 
 					game_id = log.get('id',None),
 					name = log.get('game',None),
@@ -121,19 +113,20 @@ def logs_sync(username='Unknown'):
 	with pysftp.Connection('74.91.124.236',username='slash',private_key='/home/slashdiablo/.ssh/id_rsa') as sftp:
 		with sftp.cd('log'):
 			for dir in sftp.listdir():
+				r = random.randint(0,100000)
 				if (not sftp.isdir(dir) and not dir.find('.log')) or dir == "Parsed":
 					continue
 				if sftp.isdir(dir):
 					file = "%s\\d2gs.log" % dir
 				else:
 					file = dir
-				sftp.get('%s' % file,localpath='/srv/slashdiablo/www/logs/%s-d2gs.log' % dir,callback=sftp_progress,preserve_mtime=True)
-				logs_parse.delay('/srv/slashdiablo/www/logs/%s-d2gs.log' % dir,remove=True)
-				subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\'" % dir, shell=True)
+				sftp.get('%s' % file,localpath='/srv/slashdiablo/www/logs/%s-d2gs-%s.log' % (dir,r),callback=sftp_progress,preserve_mtime=True)
+				logs_parse.delay('/srv/slashdiablo/www/logs/%s-d2gs-%s.log' % (dir,r),remove=True)
+				subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\%s-d2gs-%s.log'" % (dir,dir,r), shell=True)
 
 		if sftp.isfile('d2gs.log'):
 			dt = datetime.datetime.now()
-			fname = datetime.datetime.now().strftime("%Y-%m-%d--%H.%M-d2gs.log")
+			fname = "%s-%s.log" % (datetime.datetime.now().strftime("%Y-%m-%d--%H.%M-d2gs"),r)
 			subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c copy C:\\D2GS\\d2gs.log C:\\D2GS\\log\\%s'" % fname, shell=True)
 			subprocess.call("ssh slash@gs.slashdiablo.net 'powershell -inputformat none -command \"& {Clear-Content C:\D2GS\d2gs.log}\"'", shell=True)
 			sftp.get('log/%s' % fname,localpath='/srv/slashdiablo/www/logs/%s' % fname,callback=sftp_progress,preserve_mtime=True)

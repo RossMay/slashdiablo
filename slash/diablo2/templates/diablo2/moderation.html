@@ -77,6 +77,51 @@
 			});
 			{% endif %}
 			{% if perms.diablo2.moderation_investigate_logs %}
+			$('.log-search').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'logs',
+						target: $(this).attr('name'),
+						terms: $('#log_search_query').val()
+					}
+				}).done(function(message){
+					if (message.success){
+						results = $('<div class="row">'+
+								'<div class="col-md-12">'+
+									'<div class="x_panel">'+
+										'<div class="x_title">'+
+											'<h2>'+message.count + ' Results<small>' + message.query+'</small></h2>'+
+											//'<ul class="nav navbar-right panel_toolbox">'+
+							                                //        '<li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>'+
+							              		        //        '</ul>'+
+											'<div class="clearfix"></div>'+
+										'</div>'+
+										'<div class="x_content">'+
+											message.result+
+										'</div>'+
+									'</div>'+
+								'</div>',+
+							'</div>');
+
+
+						$('#log-search-results').prepend(results);
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
 			{% endif %}
 			{% if perms.diablo2.moderation_investigate_report %}
 			{% endif %}
@@ -115,8 +160,6 @@
 								{% if perms.diablo2.moderation_investigate_database %}<li><a href="#i-db-tab" data-toggle="tab">Database</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_logs %}<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_report %}<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>{% endif %}
-								{% if perms.diablo2.moderation_investigate_account %}<li><a href="#i-acct-tab" data-toggle="tab">Account</a></li>{% endif %}
-								{% if perms.diablo2.moderation_investigate_character %}<li><a href="#i-char-tab" data-toggle="tab">Character</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-9">
@@ -130,10 +173,10 @@
 								</div>
 								{% if perms.diablo2.moderation_investigate_database %}
 								<div class="tab-pane" id="i-db-tab">
-									<div id='db-search-pane' class="col-md-12">
+									<div class="col-md-12">
 										<p class="lead">Database Search</p>
 										<p>Search the PVPGN Database for accounts.</p>
-				                                                <div class="input-group">
+				                                                <div class="input-group col-xs-9">
 											<input id='db_search_query' type="text" class="form-control" aria-label="Database search query">
 											<div class="input-group-btn">
 												<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">Search <span class="caret"></span></button>
@@ -151,10 +194,34 @@
 								{% endif %}
 								{% if perms.diablo2.moderation_investigate_logs %}
 								<div class="tab-pane" id="i-log-tab">
-									<p class="lead">Log</p>
-									<p>
-										Lookup things from the GS log like game list, ip addresses
-									</p>
+									<div class="col-md-12">
+										<p class="lead">Log Search</p>
+										<p>Search the D2GS logs for ip addresses and game history</p>
+				                                                <div class="input-group col-xs-9">
+											<input id='log_search_query' type="text" class="form-control" aria-label="Log search query">
+											<div class="input-group-btn">
+												<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">Search <span class="caret"></span></button>
+												<ul class="dropdown-menu dropdown-menu-right" role="menu">
+													<li><a class='log-search' name='activity-account' href="#">Activity (Account)</a></li>
+													<li><a class='log-search' name='activity-character' href="#">Activity List (Character)</a></li>
+													<li><a class='log-search' name='activity-ip' href="#">Activity List (IP)</a></li>
+													<li class="divider"></li>
+													<li><a class='log-search' name='ip-account' href="#">IP List (Account)</a></li>
+													<li><a class='log-search' name='ip-character' href="#">IP List (Character)</a></li>
+													<li><a class='log-search' name='ip-ip' href="#">IP List (IP)</a></li>
+													<li class="divider"></li>
+													<li><a class='log-search' name='gamelist-account' href="#">Game List (Account)</a></li>
+													<li><a class='log-search' name='gamelist-character' href="#">Game List (Character)</a></li>
+													<li><a class='log-search' name='gamelist-ip' href="#">Game List (IP)</a></li>
+													<li class="divider"></li>
+													<li><a class='log-search' name='account-ip' href="#">Account List (IP)</a></li>
+													<li class="divider"></li>
+													<li><a class='log-search' name='gameinfo' href="#">Game Info (Game Name)</a></li>
+												</ul>
+											</div>
+										</div>
+										<div id="log-search-results"></div>
+                                        				</div>
 								</div>
 								{% endif %}
 								{% if perms.diablo2.moderation_investigate_report %}
@@ -163,22 +230,6 @@
 									<p>
 										Generate reports on a user account
 									</p>
-								</div>
-								{% endif %}
-								{% if perms.diablo2.moderation_investigate_account %}
-								<div class="tab-pane" id="i-acct-tab">
-									<p class="lead">Account</p>
-									<p>
-										Lookup based on the imported accounts model
-									</p>
-								</div>
-								{% endif %}
-								{% if perms.diablo2.moderation_investigate_character %}
-								<div class="tab-pane" id="i-char-tab">
-									<p class="lead">Character</p>
-									<p>
-										Lookup based on the imported character model
-									</p>	
 								</div>
 								{% endif %}
 							</div>
