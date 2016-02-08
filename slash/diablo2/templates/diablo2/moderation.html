@@ -51,9 +51,6 @@
 									'<div class="x_panel">'+
 										'<div class="x_title">'+
 											'<h2>'+message.count + ' Results<small>' + message.query+'</small></h2>'+
-											//'<ul class="nav navbar-right panel_toolbox">'+
-							                                //        '<li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>'+
-							              		        //        '</ul>'+
 											'<div class="clearfix"></div>'+
 										'</div>'+
 										'<div class="x_content">'+
@@ -98,9 +95,6 @@
 									'<div class="x_panel">'+
 										'<div class="x_title">'+
 											'<h2>'+message.count + ' Results<small>' + message.query+'</small></h2>'+
-											//'<ul class="nav navbar-right panel_toolbox">'+
-							                                //        '<li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>'+
-							              		        //        '</ul>'+
 											'<div class="clearfix"></div>'+
 										'</div>'+
 										'<div class="x_content">'+
@@ -124,10 +118,47 @@
 			});
 			{% endif %}
 			{% if perms.diablo2.moderation_investigate_report %}
-			{% endif %}
-			{% if perms.diablo2.moderation_investigate_account %}
-			{% endif %}
-			{% if perms.diablo2.moderation_investigate_character %}
+			$('.report-generate').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'report',
+						terms: $('#report_query').val()
+					}
+				}).done(function(message){
+					if (message.success){
+						results = $('<div class="row">'+
+								'<div class="col-md-12">'+
+									'<div class="x_panel">'+
+										'<div class="x_title">'+
+											'<h2>Report for ' + message.query+'</h2>'+
+											'<div class="clearfix"></div>'+
+										'</div>'+
+										'<div class="x_content">'+
+											message.result+
+										'</div>'+
+									'</div>'+
+								'</div>',+
+							'</div>');
+
+
+						$('#report-results').prepend(results);
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
 			{% endif %}
 			{% endif %}
 		});
@@ -154,7 +185,7 @@
 						<div class="clearfix"></div>
 					</div>
 					<div class="x_content">
-						<div class="col-xs-3">
+						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
 								<li class="active"><a href="#i-sync-tab" data-toggle="tab">Sync Log</a></li>
 								{% if perms.diablo2.moderation_investigate_database %}<li><a href="#i-db-tab" data-toggle="tab">Database</a></li>{% endif %}
@@ -162,7 +193,7 @@
 								{% if perms.diablo2.moderation_investigate_report %}<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>{% endif %}
 							</ul>
 						</div>
-						<div class="col-xs-9">
+						<div class="col-xs-10">
 							<div class="tab-content">
 								<div class="tab-pane active" id="i-sync-tab">
 									<div class="col-md-12">
@@ -226,10 +257,17 @@
 								{% endif %}
 								{% if perms.diablo2.moderation_investigate_report %}
 								<div class="tab-pane" id="i-report-tab">
-									<p class="lead">Report</p>
-									<p>
-										Generate reports on a user account
-									</p>
+									<div class="col-md-12">
+										<p class="lead">Generate Report</p>
+										<p>Generate a full activity report for a user based on an account name</p>
+				                                                <div class="input-group col-xs-9">
+											<input id='report_query' type="text" class="form-control" aria-label="Report account name">
+											<div class="input-group-btn">
+												<button type="button" class="report-generate btn btn-primary">Generate</button>
+											</div>
+										</div>
+										<div id="report-results"></div>
+                                        				</div>
 								</div>
 								{% endif %}
 							</div>
@@ -252,7 +290,7 @@
 						<div class="clearfix"></div>
 					</div>
 					<div class="x_content">
-						<div class="col-xs-3">
+						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
 								<li class="active"><a href="#a-lock-tab" data-toggle="tab">Lock Account</a></li>
 								<li><a href="#a-unlock-tab" data-toggle="tab">Unlock Account</a></li>
@@ -263,7 +301,7 @@
 								<li><a href="#a-chpass-tab" data-toggle="tab">Change Password</a></li>
 							</ul>	
 						</div>
-						<div class="col-xs-9">
+						<div class="col-xs-10">
 							<div class="tab-content">
 								<div class="tab-pane active" id="a-lock-tab">
 									<p class="lead">Lock Account</p>
@@ -333,13 +371,13 @@
 						<div class="clearfix"></div>
 					</div>
 					<div class="x_content">
-						<div class="col-xs-3">
+						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
 								<li class="active"><a href="#g-list-tab" data-toggle="tab">Game List</a></li>
 								<li><a href="#g-detail-tab" data-toggle="tab">Game Details</a></li>
 							</ul>
 						</div>
-						<div class="col-xs-9">
+						<div class="col-xs-10">
 							<div class="tab-content">
 								<div class="tab-pane active" id="g-list-tab">
 									<p class="lead">Game List</p>
@@ -373,7 +411,7 @@
 						<div class="clearfix"></div>
 					</div>
 					<div class="x_content">
-						<div class="col-xs-3">
+						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
 								<li class="active"><a href="#h-gs-tab" data-toggle="tab">Gameserver Log</a></li>
 								<li><a href="#h-report-tab" data-toggle="tab">Reports</a></li>
@@ -381,7 +419,7 @@
 								<li><a href="#h-action-tab" data-toggle="tab">Action</a></li>
 							</ul>
 						</div>
-						<div class="col-xs-9">
+						<div class="col-xs-10">
 							<div class="tab-content">
 								<div class="tab-pane active" id="h-gs-tab">
 									<p class="lead">Gamserver Log</p>
@@ -427,14 +465,14 @@
 						<div class="clearfix"></div>
 					</div>
 					<div class="x_content">
-						<div class="col-xs-3">
+						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
 								<li class="active"><a href="#sy-status-tab" data-toggle="tab">Status</a></li>
 								<li><a href="#sy-d2gs-tab" data-toggle="tab">D2GS</a></li>
 								<li><a href="#sy-pvpgn-tab" data-toggle="tab">PVPGN</a></li>
 							</ul>
 						</div>
-						<div class="col-xs-9">
+						<div class="col-xs-10">
 							<div class="tab-content">
 								<div class="tab-pane active" id="sy-status-tab">
 									<p class="lead">System Status</p>

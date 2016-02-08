@@ -1,3 +1,4 @@
+from django.db.models.query import QuerySet
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required,permission_required
 from django.contrib.auth.models import User
@@ -13,8 +14,6 @@ from base.models import Variable
 from . import tasks
 
 import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess,random
-
-#ssh slash@gs.slashdiablo.net 'cmd /c echo|set /p=>c:\D2GS\Testlog.log'
 
 def premium(request):
 	return render(request,'diablo2/premium.html',{})
@@ -584,7 +583,116 @@ def moderation_search(request):
 
 				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': log.results})
 			elif source == 'report':
-				return JsonResponse({'success': True, 'action': 'Search', 'source': 'Report'})
+				if not request.user.has_perm('diablo2.moderation_investigate_report'):
+					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+
+				terms = request.POST.get('terms',False)
+
+				if not terms or not len(terms):
+					return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
+
+				log = LookupLog(user=request.user,type=source,target='account',query=terms,parsed_query='',results=0)
+				log.save()
+
+
+				accounts = []
+				new_accounts = ['%s' % terms]
+				ips = []
+				new_ips = []
+				ignore_accounts = ['HCSlash']
+				ignore_ips = []
+
+				depth=2
+
+				report =     '''=====================================================================<br/>
+						Generating list of accounts and IPs associated with *%s<br/>
+						=====================================================================<br/><br/>''' % terms
+				
+				for i in range(0,depth):
+					if not i == 0:
+						report = report +    '''=====================================================================<br/>
+									Checking again for all new IPs and Accounts</br>
+									=====================================================================<br/>'''
+					for account in new_accounts:
+						if account in ignore_accounts:
+							print "Ignoring account %s" % account
+							continue
+						if account in accounts:
+							print "Already searched account %s" % account
+							continue
+						print "Searching for IPs by account %s" % account
+	
+						entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
+						current_ips = []
+						for entry in entries:
+							if entry.ip in current_ips:
+								continue
+							elif entry.ip not in ips:
+								if entry.ip not in new_ips:
+									new_ips.append(entry.ip)
+									current_ips.append(entry.ip)
+									print "New IP %s" % entry.ip
+								else:
+									current_ips.appen(entry.ip)
+									print 'Already checked %s' % entry.ip
+							elif entry.ip not in current_ips:
+								current_ips.append(entry.ip)
+								print 'Already checked %s' % entry.ip
+		
+						accounts.append(account)
+	
+					new_accounts = []
+					for ip in new_ips:
+						if ip in ignore_ips:
+							print "Ignoring IP %s" % ip
+							continue
+						if ip in ips:
+							print "Already Searched %s" % ip
+							continue
+						print "Searching for accounts by IP %s" % ip
+						entries = GameserverLog.objects.filter(ip=ip).only('account_name')
+						current_accounts = []
+						for entry in entries:
+							if entry.account_name in current_accounts:
+								continue
+							elif entry.account_name not in accounts:
+								if entry.account_name not in new_accounts:
+									new_accounts.append(entry.account_name)
+									current_accounts.append(entry.account_name)
+									print "New account %s" % entry.account_name
+								else:
+									current_accounts.append(entry.account_name)
+									print "Already searched %s" % entry.account_name
+							elif entry.account_name not in current_accounts:
+								current_accounts.append(entry.account_name)
+								print "Already searched %s" % entry.account_name
+						ips.append(ip)
+
+					if len(new_accounts) == 0 and len(new_ips) == 0:
+						print "No new accounts, ending"
+						report = report +    '''=====================================================================<br/>
+									No additional IPs or accounts</br>
+									=====================================================================<br/>'''
+					else:
+						report = report +    '''=====================================================================<br/>
+									New IP and Account Summary<br/>
+									=====================================================================<br/>
+									New IPs tied to accounts<br/><br/>
+									%s<br/><br/>
+									New Accounts tied to ips<br/><br/>
+									%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
+
+					new_ips = []
+
+				report = report +    '''=====================================================================<br/>
+							Final IP and Account Summary<br/>
+							=====================================================================<br/>
+							IPs tied to accounts<br/><br/>
+							%s<br/><br/>
+							Accounts tied to ips<br/><br/>
+							%s<br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts))
+
+				return JsonResponse({'success': True, 'query': terms, 'result': report})
 		return JsonResponse({'success': True})
 	else:
 		raise Http404
