@@ -587,7 +587,7 @@ def moderation_search(request):
 				if not request.user.has_perm('diablo2.moderation_investigate_report'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
 
-				report_status = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username)
+				report_status,created = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username, defaults={'json': '{}'})
 				rs_json = json.loads(report_status.json)
 				if rs_json.get('report_active',False):
 					return JsonResponse({'success': False, 'message': 'You already have a running report, please wait.', 'type': 'error', 'title': 'Error'})
