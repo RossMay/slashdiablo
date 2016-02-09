@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 
-from .models import Account,Character,FailedLog,GameserverLog,LookupLog
+from .models import Account,Character,FailedLog,GameserverLog,LookupLog,Report
 
 from base.models import Variable
 
@@ -41,6 +41,7 @@ def moderation(request):
 	context['log_sync_mins'] = int((datetime.datetime.now() - context['log_sync_time']).seconds) / 60
 	context['log_sync_user'] = json.loads(last_sync.json).get('user','Unknown')
 
+	context['report_ignore'] = ['HCSlash']
 
 	return render(request,'diablo2/moderation.html',context)
 
@@ -272,12 +273,12 @@ def moderation_search(request):
 					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
 
 				
+				target_map = { 'account': 'acct_username', 'email': 'acct_email', 'ip': 'acct_lastlogin_ip', 'password': 'acct_passhash1'}
 				if target == 'password':
 					if not request.user.has_perm('diablo2.moderation_investigate_database_password'):
 						return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
 					query = 'acct_passhash1 = (SELECT acct_passhash1 from BNET where acct_username = \'%s\');' % parsed_terms.replace('*','%')
 				else:
-					target_map = { 'account': 'acct_username', 'email': 'acct_email', 'ip': 'acct_lastlogin_ip'}
 					query = '%s like \'%s\';' % (target_map[target], parsed_terms.replace('*','%'))
 
 				short_query = '%s = %s' % (target_map[target],parsed_terms)
@@ -586,113 +587,226 @@ def moderation_search(request):
 				if not request.user.has_perm('diablo2.moderation_investigate_report'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
 
-				terms = request.POST.get('terms',False)
+				report_status = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username)
+				rs_json = json.loads(report_status.json)
+				if rs_json.get('report_active',False):
+					return JsonResponse({'success': False, 'message': 'You already have a running report, please wait.', 'type': 'error', 'title': 'Error'})
 
-				if not terms or not len(terms):
-					return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
+				report_id = request.POST.get('reportid',False)
+		
 
-				log = LookupLog(user=request.user,type=source,target='account',query=terms,parsed_query='',results=0)
+				ignore_accounts = []
+				ignore_ips = []
+
+				accounts = []
+				ips = []
+				new_ips = []
+
+				ignore = re.sub('[^\w_\-\[\]\,\.]','',request.POST.get('ignore',''))
+
+				if report_id:
+					report = Report.objects.get(id=int(report_id))
+					log = LookupLog(user=request.user,type='report-continue',target=report_id,query='',parsed_query='',results=0)
+					
+					new_accounts = []
+					for term in report.processed.split(','):
+						if re.match('\d+\.\d+\.\d+\.\d+',term):
+							ips.append(term)
+						else:
+							accounts.append(term)
+
+					for term in report.next.split(','):
+						if re.match('\d+\.\d+\.\d+\.\d+',term):
+							new_ips.append(term)
+						else:
+							new_accounts.append(term)
+
+				else:
+					terms = request.POST.get('terms',False)
+					new_accounts = ['%s' % terms]
+
+					if not terms or not len(terms):
+						return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
+
+					log = LookupLog(user=request.user,type=source,target='account',query=terms,parsed_query='',results=0)
+
+
+
+
+				for term in ignore.split(','):
+					if re.match('\d+\.\d+\.\d+\.\d+',term):
+						ignore_ips.append(term)
+					else:
+						ignore_accounts.append(term)
+
 				log.save()
 
 
-				accounts = []
-				new_accounts = ['%s' % terms]
-				ips = []
-				new_ips = []
-				ignore_accounts = ['HCSlash']
-				ignore_ips = []
+				if not report_id:
+					content =     '''=====================================================================<br/>
+							Generating list of accounts and IPs associated with *%s<br/>
+							=====================================================================<br/><br/>
+							Ignoring IPs<br/>%s<br/><br/>Ignoring Accounts<br/>%s<br/><br/>''' % (terms,'<br/>'.join(ignore_ips),'<br/>'.join(ignore_accounts))
 
-				depth=2
+				else:
+					content = report.results +  '''=====================================================================<br/>
+								Checking again for all new IPs and Accounts</br>
+								=====================================================================<br/>'''
+				for account in new_accounts:
+					if account in ignore_accounts:
+						print "Ignoring account %s" % account
+						continue
+					if account in accounts:
+						print "Already searched account %s" % account
+						continue
+					print "Searching for IPs by account %s" % account
 
-				report =     '''=====================================================================<br/>
-						Generating list of accounts and IPs associated with *%s<br/>
-						=====================================================================<br/><br/>''' % terms
-				
-				for i in range(0,depth):
-					if not i == 0:
-						report = report +    '''=====================================================================<br/>
-									Checking again for all new IPs and Accounts</br>
-									=====================================================================<br/>'''
-					for account in new_accounts:
-						if account in ignore_accounts:
-							print "Ignoring account %s" % account
+					entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
+					current_ips = []
+					for entry in entries:
+						if entry.ip in current_ips:
 							continue
-						if account in accounts:
-							print "Already searched account %s" % account
-							continue
-						print "Searching for IPs by account %s" % account
-	
-						entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
-						current_ips = []
-						for entry in entries:
-							if entry.ip in current_ips:
-								continue
-							elif entry.ip not in ips:
-								if entry.ip not in new_ips:
-									new_ips.append(entry.ip)
-									current_ips.append(entry.ip)
-									print "New IP %s" % entry.ip
-								else:
-									current_ips.appen(entry.ip)
-									print 'Already checked %s' % entry.ip
-							elif entry.ip not in current_ips:
+						elif entry.ip not in ips:
+							if entry.ip not in new_ips:
+								new_ips.append(entry.ip)
+								current_ips.append(entry.ip)
+								print "New IP %s" % entry.ip
+							else:
 								current_ips.append(entry.ip)
 								print 'Already checked %s' % entry.ip
-		
-						accounts.append(account)
+						elif entry.ip not in current_ips:
+							current_ips.append(entry.ip)
+							print 'Already checked %s' % entry.ip
 	
-					new_accounts = []
-					for ip in new_ips:
-						if ip in ignore_ips:
-							print "Ignoring IP %s" % ip
+					accounts.append(account)
+
+				new_accounts = []
+				for ip in new_ips:
+					if ip in ignore_ips:
+						print "Ignoring IP %s" % ip
+						continue
+					if ip in ips:
+						print "Already Searched %s" % ip
+						continue
+					print "Searching for accounts by IP %s" % ip
+					entries = GameserverLog.objects.filter(ip=ip).only('account_name')
+					current_accounts = []
+					for entry in entries:
+						if entry.account_name in current_accounts:
 							continue
-						if ip in ips:
-							print "Already Searched %s" % ip
-							continue
-						print "Searching for accounts by IP %s" % ip
-						entries = GameserverLog.objects.filter(ip=ip).only('account_name')
-						current_accounts = []
-						for entry in entries:
-							if entry.account_name in current_accounts:
-								continue
-							elif entry.account_name not in accounts:
-								if entry.account_name not in new_accounts:
-									new_accounts.append(entry.account_name)
-									current_accounts.append(entry.account_name)
-									print "New account %s" % entry.account_name
-								else:
-									current_accounts.append(entry.account_name)
-									print "Already searched %s" % entry.account_name
-							elif entry.account_name not in current_accounts:
+						elif entry.account_name not in accounts:
+							if entry.account_name not in new_accounts:
+								new_accounts.append(entry.account_name)
+								current_accounts.append(entry.account_name)
+								print "New account %s" % entry.account_name
+							else:
 								current_accounts.append(entry.account_name)
 								print "Already searched %s" % entry.account_name
-						ips.append(ip)
+						elif entry.account_name not in current_accounts:
+							current_accounts.append(entry.account_name)
+							print "Already searched %s" % entry.account_name
+					ips.append(ip)
 
-					if len(new_accounts) == 0 and len(new_ips) == 0:
-						print "No new accounts, ending"
-						report = report +    '''=====================================================================<br/>
-									No additional IPs or accounts</br>
-									=====================================================================<br/>'''
-					else:
-						report = report +    '''=====================================================================<br/>
-									New IP and Account Summary<br/>
-									=====================================================================<br/>
-									New IPs tied to accounts<br/><br/>
-									%s<br/><br/>
-									New Accounts tied to ips<br/><br/>
-									%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
+				final = len(new_accounts) == 0
+				if final:
+					print "No new accounts, ending"
+					content = content +  '''=====================================================================<br/>
+								No additional IPs or accounts</br>
+								=====================================================================<br/>'''
+				else:
+					content = content +  '''=====================================================================<br/>
+								New IP and Account Summary<br/>
+								=====================================================================<br/>
+								New IPs tied to accounts<br/><br/>
+								%s<br/><br/>
+								New Accounts tied to ips<br/><br/>
+								%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
 
-					new_ips = []
+				new_ips = []
 
-				report = report +    '''=====================================================================<br/>
+				summary = 	     '''=====================================================================<br/>
 							Final IP and Account Summary<br/>
 							=====================================================================<br/>
 							IPs tied to accounts<br/><br/>
 							%s<br/><br/>
 							Accounts tied to ips<br/><br/>
-							%s<br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts))
+							%s<br/><br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts+new_accounts))
 
-				return JsonResponse({'success': True, 'query': terms, 'result': report})
+				if final:
+					#Print db results for each account username,pass,email,ip, logintime, lock
+					#Print list of accounts with matching lastlogin ip
+					#Print list of accounts with matching passhash
+					#print list of accounts with matching emails
+					pass
+
+				if not report_id:
+					report = Report(user = request.user,
+						target = terms,
+						depth = 0,
+						ignores = re.sub('[^\w_\-\[\]\,\.]','',request.POST.get('ignore','')))
+				report.depth += 1
+				report.active = final
+				report.summary = summary
+				report.results = content
+				report.processed = ','.join(accounts+ips)
+				report.next = ','.join(new_accounts+new_ips)
+	
+				report.save()
+
+				return JsonResponse({'success': True, 'query': report.target, 'result': summary + content, 'reportid': report.id, 'final': final, 'depth': '%s' % report.depth})
 		return JsonResponse({'success': True})
 	else:
 		raise Http404
+
+
+def kill_multibox():
+	tn = telnetlib.Telnet(settings.DIABLO2GS,8888)
+	tn.read_until('Password:')
+	tn.write('%s\n' % settings.DIABLO2GSPW)
+	tn.read_until('D2GS>')
+	tn.write('gl\n')
+	gl = tn.read_until('D2GS>')
+
+	gids = []
+	ips = {}
+	games = re.findall(r'\|(.*)\|',gl)
+	for game in games:
+		parsed = re.match(r' (?P<line>\d+)  (?P<game>.{15})  (?P<password>.{15})\s+(?P<gid>\d+).*',game)
+		if parsed:
+			gids.append(parsed.groupdict()['gid'])
+
+	for gid in gids:
+		tn.write('cl %s\n' % gid)
+		cl =tn.read_until('D2GS>')
+
+		chars = re.findall(r'\|(.*)\|',cl)
+		for char in chars:
+			parsed = re.match(r' (?P<line>\d+)  (?P<account>.{15})  (?P<char>.{15})\s+(?P<ip>[\d\.]+)\s+(?P<class>\w+)\s+(?P<level>\d+)\s+(?P<joined>[\w:]+).*',char)
+			if parsed:
+				if not parsed.groupdict()['ip'] in ips.keys():
+					ips[parsed.groupdict()['ip']] = {'count': 0, 'accounts': []}
+				ips[parsed.groupdict()['ip']]['count'] += 1
+				ips[parsed.groupdict()['ip']]['accounts'].append((parsed.groupdict()['account'].rstrip(),parsed.groupdict()['char'].rstrip()))
+				
+
+	for ip in ips.keys():		
+		kick = False
+		print '\n%s\t%d\t' % (ip,ips[ip]['count']),
+		if ips[ip]['count'] > int(Variable.objects.get(name='diablo2_max_connections').value):
+			print '\n\tMore connections than allowed from ip %s, kicking chars' % (settings.DIABLO2MAXCONN,ip)
+			kick = True
+		for acct,char in ips[ip]['accounts']:
+			if kick:
+				tn.write('kick %s\n' % char)
+				tn.read_until('D2GS>')
+				print '\n\t\tKicking *%s on %s' % (acct, char),
+			else:
+				print '*%s on %s, ' % (acct, char),
+		if kick:
+			ActionLog(action='Kill Multibox',target='%s - %s - %s' % (ip,ips[ip]['count'],','.join('*%s on %s' % (x[0],x[1]) for x in ips[ip]['accounts'])))			
+
+
+
+	tn.write('exit\n')
+
+	return True

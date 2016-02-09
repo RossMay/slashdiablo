@@ -161,34 +161,15 @@ class LookupLog(models.Model):
 	def __unicode__(self):
 		return "%s - %s" % (self.user,self.parsed_query)
 
-class ActionLog(models.Model):
-	user = models.ForeignKey(User,blank=True,null=True,help_text='User who performed the action')
-	action = models.CharField(blank=False,null=False,max_length=20,help_text='Which action was done')
-	target = models.CharField(blank=False,null=False,max_length=255,help_text='Target of action')
-	date = models.DateTimeField(auto_now_add=True,help_text='When the action was preformed')
-
-	class Meta:
-		verbose_name = "Action Log"
-
-	def __unicode__(self):
-		return "%s - %s" % (self.user if self.user else 'Command Line',self.action)
-
 class Report(models.Model):
-	user = models.ForeignKey(User,blank=False,null=False,help_text='User who generated this report')
-	target = models.CharField(blank=False,null=False,max_length=25,help_text='Account the report was generated for')
-	date = models.DateTimeField(auto_now_add=True,help_text='When the report was started')
-	active = models.BooleanField(default=False,help_text='Report is currently being generated')
-	results = models.TextField(blank=True,null=True,help_text='Report contents')
-	results_full = models.TextField(blank=True,null=True,help_text='Full report contents')
-	summary = models.TextField(blank=True,null=True,help_text='Report Summary')
-	ignores = models.TextField(blank=True,null=True,help_text='List of entries ignored by this report')
-	processed = models.TextField(blank=True,null=True,help_text='List of accounts and ips that were processed')
-	next = models.TextField(blank=True,null=True,help_text='List of accounts and ips to search next')
-	depth = models.IntegerField(default=1,help_text='Depth of search')
-
+	user = models.ForeignKey(User,blank=False,null=False,help_text='User who ran the query')
+	active = models.BooleanField(default=False,help_text='Is query currently running')
+	date = models.DateTimeField(blank=True,null=True,help_text='Time the query was run')
+	query = models.CharField(blank=False,null=False,max_length=255,help_text='User provided query')
+	ignores = models.CharField(blank=False,null=False,max_length=255,help_text='List of values to ignore')
 
 	class Meta:
 		verbose_name = "Report"
 
 	def __unicode__(self):
-		return self.target
+		return self.query

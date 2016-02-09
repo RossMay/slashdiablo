@@ -3,6 +3,7 @@
 {% block title %}Slash Gaming - Diablo2{% endblock %}
 
 {% block extra-scripts %}
+	<script src="/media/theme/js/tags/jquery.tagsinput.min.js"></script>
 	<script>
 		$(document).ready(function(){
 
@@ -118,6 +119,21 @@
 			});
 			{% endif %}
 			{% if perms.diablo2.moderation_investigate_report %}
+			function update_tags(elem,elem_tags){
+				var report_ignore = [{% for a in report_ignore %}'{{ a }}'{% if not forloop.last %},{% endif %}{% endfor %}];
+				$('.tag',elem_tags).each(function(){
+					if($(this).text().search(new RegExp('\\b(' + report_ignore.join('|') + ')\\b')) >= 0){
+						$(this).css('background-color','#1479B8');
+					}
+				});
+			}
+               		$('#report_ignore_tags').tagsInput({
+	                	width: 'auto',
+				onChange: update_tags,
+				onAddTag: update_tags,
+				onRemoveTag: update_tags,
+				defaultText: '+Exclude'
+               		});
 			$('.report-generate').click(function(event){
 				event.preventDefault();
 				$.ajax({
@@ -129,15 +145,21 @@
 					data: {
 						action: 'search',
 						source: 'report',
-						terms: $('#report_query').val()
+						terms: $('#report_query').val(),
+						ignore: $('#report_ignore_tags').val()
 					}
 				}).done(function(message){
 					if (message.success){
-						results = $('<div class="row">'+
+						if (message.final){
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button></small></h2>';
+						}else{
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button></small></h2>';
+						}
+						results = $('<div class="row" id="report-'+ message.reportid +'">'+
 								'<div class="col-md-12">'+
 									'<div class="x_panel">'+
 										'<div class="x_title">'+
-											'<h2>Report for ' + message.query+'</h2>'+
+											title +
 											'<div class="clearfix"></div>'+
 										'</div>'+
 										'<div class="x_content">'+
@@ -149,6 +171,50 @@
 
 
 						$('#report-results').prepend(results);
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
+			$('#i-report-tab').on('click', '.report-continue', function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'report',
+						reportid: $(this).attr('name'),
+					}
+				}).done(function(message){
+					if (message.success){
+						if (message.final){
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button></small></h2>';
+						}else{
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button></small></h2>';
+						}
+						results = $('<div class="col-md-12">'+
+								'<div class="x_panel">'+
+									'<div class="x_title">'+
+										title +
+										'<div class="clearfix"></div>'+
+									'</div>'+
+									'<div class="x_content">'+
+										message.result+
+									'</div>'+
+								'</div>'+
+							'</div>');
+
+
+						$('#report-'+message.reportid).html(results);
 					}else{
 						new PNotify({
 							title: message.title,
@@ -266,8 +332,15 @@
 												<button type="button" class="report-generate btn btn-primary">Generate</button>
 											</div>
 										</div>
-										<div id="report-results"></div>
                                         				</div>
+									<div class="col-md-12">
+										<div class="input-group col-xs-9">
+											<input id="report_ignore_tags" type="text" class="tags form-control" value="{% for a in report_ignore %}{{ a }}{% if not forloop.last %},{% endif %}{% endfor %}" />
+										</div>
+									</div>
+									<div class="col-md-12">
+										<div id="report-results"></div>
+									</div>
 								</div>
 								{% endif %}
 							</div>

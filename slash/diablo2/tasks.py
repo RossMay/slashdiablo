@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from django.conf import settings
 from django.utils import timezone
 
-from .models import FailedLog,GameserverLog
+from .models import FailedLog,GameserverLog,ActionLog
 
 from base.models import Variable
 
@@ -11,7 +11,58 @@ import pytz,os,datetime,re,pysftp,subprocess
 
 from celery import shared_task
 
-import json, random
+import json, random, telnetlib
+
+@shared_task()
+def log_cleanup():
+	before = datetime.datetime.now() - datetime.timedelta(days=20)
+	GameserverLog.objects.filter(date__lte=before).delete()
+
+@shared_task
+def kill_multibox():
+	tn = telnetlib.Telnet(settings.DIABLO2GS,8888)
+	tn.read_until('Password:')
+	tn.write('%s\n' % settings.DIABLO2GSPW)
+	tn.read_until('D2GS>')
+	tn.write('gl\n')
+	gl = tn.read_until('D2GS>')
+
+	gids = []
+	ips = {}
+	games = re.findall(r'\|(.*)\|',gl)
+	for game in games:
+		parsed = re.match(r' (?P<line>\d+)  (?P<game>.{15})  (?P<password>.{15})\s+(?P<gid>\d+).*',game)
+		if parsed:
+			gids.append(parsed.groupdict()['gid'])
+
+	for gid in gids:
+		tn.write('cl %s\n' % gid)
+		cl =tn.read_until('D2GS>')
+
+		chars = re.findall(r'\|(.*)\|',cl)
+		for char in chars:
+			parsed = re.match(r' (?P<line>\d+)  (?P<account>.{15})  (?P<char>.{15})\s+(?P<ip>[\d\.]+)\s+(?P<class>\w+)\s+(?P<level>\d+)\s+(?P<joined>[\w:]+).*',char)
+			if parsed:
+				if not parsed.groupdict()['ip'] in ips.keys():
+					ips[parsed.groupdict()['ip']] = {'count': 0, 'accounts': []}
+				ips[parsed.groupdict()['ip']]['count'] += 1
+				ips[parsed.groupdict()['ip']]['accounts'].append((parsed.groupdict()['account'].rstrip(),parsed.groupdict()['char'].rstrip()))
+				
+
+	for ip in ips.keys():		
+		kick = False
+		if ips[ip]['count'] > int(Variable.objects.get(name='diablo2_max_connections').value):
+			kick = True
+		for acct,char in ips[ip]['accounts']:
+			if kick:
+				tn.write('kick %s\n' % char)
+				tn.read_until('D2GS>')
+		if kick:
+			ActionLog(action='Kill Multibox',target='%s - %s - %s' % (ip,ips[ip]['count'],','.join('*%s on %s' % (x[0],x[1]) for x in ips[ip]['accounts']))).save()
+
+	tn.write('exit\n')
+
+	return True
 
 @shared_task
 def logs_parse(file,remove=False):
