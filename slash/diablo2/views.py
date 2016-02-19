@@ -591,7 +591,7 @@ def moderation_search(request):
 				report_status,created = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username, defaults={'json': '{}'})
 				rs_json = json.loads(report_status.json)
 				if rs_json.get('report_active',False):
-					return JsonResponse({'success': False, 'message': 'You already have a running report, please wait.', 'type': 'error', 'title': 'Error'})
+					return JsonResponse({'success': False, 'message': 'You already have a running report. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
 
 				report_id = request.POST.get('reportid',False)
 		
@@ -653,106 +653,122 @@ def moderation_search(request):
 					content = report.results +  '''=====================================================================<br/>
 								Checking again for all new IPs and Accounts</br>
 								=====================================================================<br/>'''
-				for account in new_accounts:
-					if account in ignore_accounts:
-						print "Ignoring account %s" % account
-						continue
-					if account in accounts:
-						print "Already searched account %s" % account
-						continue
-					print "Searching for IPs by account %s" % account
 
-					entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
-					current_ips = []
-					for entry in entries:
-						if entry.ip in current_ips:
+				rs_json['report_active'] = True
+				report_status.json = json.dumps(rs_json)
+				report_status.save()
+
+				try:
+					for account in new_accounts:
+						if account in ignore_accounts:
+							print "Ignoring account %s" % account
 							continue
-						elif entry.ip not in ips:
-							if entry.ip not in new_ips:
-								new_ips.append(entry.ip)
-								current_ips.append(entry.ip)
-								print "New IP %s" % entry.ip
-							else:
+						if account in accounts:
+							print "Already searched account %s" % account
+							continue
+						print "Searching for IPs by account %s" % account
+	
+						entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
+						current_ips = []
+						for entry in entries:
+							if entry.ip in current_ips:
+								continue
+							elif entry.ip not in ips:
+								if entry.ip not in new_ips:
+									new_ips.append(entry.ip)
+									current_ips.append(entry.ip)
+									print "New IP %s" % entry.ip
+								else:
+									current_ips.append(entry.ip)
+									print 'Already checked %s' % entry.ip
+							elif entry.ip not in current_ips:
 								current_ips.append(entry.ip)
 								print 'Already checked %s' % entry.ip
-						elif entry.ip not in current_ips:
-							current_ips.append(entry.ip)
-							print 'Already checked %s' % entry.ip
+		
+						accounts.append(account)
 	
-					accounts.append(account)
-
-				new_accounts = []
-				for ip in new_ips:
-					if ip in ignore_ips:
-						print "Ignoring IP %s" % ip
-						continue
-					if ip in ips:
-						print "Already Searched %s" % ip
-						continue
-					print "Searching for accounts by IP %s" % ip
-					entries = GameserverLog.objects.filter(ip=ip).only('account_name')
-					current_accounts = []
-					for entry in entries:
-						if entry.account_name in current_accounts:
+					new_accounts = []
+					for ip in new_ips:
+						if ip in ignore_ips:
+							print "Ignoring IP %s" % ip
 							continue
-						elif entry.account_name not in accounts:
-							if entry.account_name not in new_accounts:
-								new_accounts.append(entry.account_name)
-								current_accounts.append(entry.account_name)
-								print "New account %s" % entry.account_name
-							else:
+						if ip in ips:
+							print "Already Searched %s" % ip
+							continue
+						print "Searching for accounts by IP %s" % ip
+						entries = GameserverLog.objects.filter(ip=ip).only('account_name')
+						current_accounts = []
+						for entry in entries:
+							if entry.account_name in current_accounts:
+								continue
+							elif entry.account_name not in accounts:
+								if entry.account_name not in new_accounts:
+									new_accounts.append(entry.account_name)
+									current_accounts.append(entry.account_name)
+									print "New account %s" % entry.account_name
+								else:
+									current_accounts.append(entry.account_name)
+									print "Already searched %s" % entry.account_name
+							elif entry.account_name not in current_accounts:
 								current_accounts.append(entry.account_name)
 								print "Already searched %s" % entry.account_name
-						elif entry.account_name not in current_accounts:
-							current_accounts.append(entry.account_name)
-							print "Already searched %s" % entry.account_name
-					ips.append(ip)
-
-				final = len(new_accounts) == 0
-				if final:
-					print "No new accounts, ending"
-					content = content +  '''=====================================================================<br/>
-								No additional IPs or accounts</br>
-								=====================================================================<br/>'''
-				else:
-					content = content +  '''=====================================================================<br/>
-								New IP and Account Summary<br/>
-								=====================================================================<br/>
-								New IPs tied to accounts<br/><br/>
-								%s<br/><br/>
-								New Accounts tied to ips<br/><br/>
-								%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
-
-				new_ips = []
-
-				summary = 	     '''=====================================================================<br/>
-							Final IP and Account Summary<br/>
-							=====================================================================<br/>
-							IPs tied to accounts<br/><br/>
-							%s<br/><br/>
-							Accounts tied to ips<br/><br/>
-							%s<br/><br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts+new_accounts))
-
-				if final:
-					#Print db results for each account username,pass,email,ip, logintime, lock
-					#Print list of accounts with matching lastlogin ip
-					#Print list of accounts with matching passhash
-					#print list of accounts with matching emails
-					pass
-
-				if not report_id:
-					report = Report(user = request.user,
-						target = terms,
-						depth = 0,
-						ignores = re.sub('[^\w_\-\[\]\,\.]','',request.POST.get('ignore','')))
-				report.depth += 1
-				report.active = final
-				report.summary = summary
-				report.results = content
-				report.processed = ','.join(accounts+ips)
-				report.next = ','.join(new_accounts+new_ips)
+						ips.append(ip)
 	
-				report.save()
+					final = len(new_accounts) == 0
+					if final:
+						print "No new accounts, ending"
+						content = content +  '''=====================================================================<br/>
+									No additional IPs or accounts</br>
+									=====================================================================<br/>'''
+					else:
+						content = content +  '''=====================================================================<br/>
+									New IP and Account Summary<br/>
+									=====================================================================<br/>
+									New IPs tied to accounts<br/><br/>
+									%s<br/><br/>
+									New Accounts tied to ips<br/><br/>
+									%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
+	
+					new_ips = []
+	
+					summary = 	     '''=====================================================================<br/>
+								Final IP and Account Summary<br/>
+								=====================================================================<br/>
+								IPs tied to accounts<br/><br/>
+								%s<br/><br/>
+								Accounts tied to ips<br/><br/>
+								%s<br/><br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts+new_accounts))
+	
+					if final:
+						#Print db results for each account username,pass,email,ip, logintime, lock
+						#Print list of accounts with matching lastlogin ip
+						#Print list of accounts with matching passhash
+						#print list of accounts with matching emails
+						pass
+	
+					if not report_id:
+						report = Report(user = request.user,
+							target = terms,
+							depth = 0,
+							ignores = re.sub('[^\w_\-\[\]\,\.]','',request.POST.get('ignore','')))
+					report.depth += 1
+					report.active = final
+					report.summary = summary
+					report.results = content
+					report.processed = ','.join(accounts+ips)
+					report.next = ','.join(new_accounts+new_ips)
+		
+					report.save()
+	
+					rs_json['report_active'] = False
+					report_status.json = json.dumps(rs_json)
+					report_status.save()
+				except Exception,e:
+					print "Report failed: %s" % e
+					rs_json['report_active'] = False
+					report_status.json = json.dumps(rs_json)
+					report_status.save()
+					return JsonResponse({'success':False,'message':'An error has occurred', 'type': 'error', 'title': 'Search Failed'})
 
 				return JsonResponse({'success': True, 'query': report.target, 'result': summary + content, 'reportid': report.id, 'final': final, 'depth': '%s' % report.depth})
 		return JsonResponse({'success': True})
