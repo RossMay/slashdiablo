@@ -41,7 +41,8 @@ def moderation(request):
 	context['log_sync_mins'] = int((datetime.datetime.now() - context['log_sync_time']).seconds) / 60
 	context['log_sync_user'] = json.loads(last_sync.json).get('user','Unknown')
 
-	context['report_ignore'] = ['HCSlash']
+
+	context['report_ignore'] = json.loads(Variable.objects.get(name='diablo2_report_ignore').json).get('ignore_list',{})
 
 	return render(request,'diablo2/moderation.html',context)
 
