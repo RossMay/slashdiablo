@@ -41,8 +41,8 @@ def moderation(request):
 	context['log_sync_mins'] = int((datetime.datetime.now() - context['log_sync_time']).seconds) / 60
 	context['log_sync_user'] = json.loads(last_sync.json).get('user','Unknown')
 
-
-	context['report_ignore'] = json.loads(Variable.objects.get(name='diablo2_report_ignore').json).get('ignore_list',{})
+	prev_ignores,created = Variable.objects.get_or_create(name = 'diablo2_report_ignore_%s' % request.user.username, defaults={'json': '{}'})
+	context['report_ignore'] = json.loads(prev_ignores.json).get('ignore','')
 
 	return render(request,'diablo2/moderation.html',context)
 
@@ -624,6 +624,10 @@ def moderation_search(request):
 							new_accounts.append(term)
 
 				else:
+					prev_ignores,created = Variable.objects.get_or_create(name = 'diablo2_report_ignore_%s' % request.user.username, defaults={'json': '{}'})
+					prev_ignores.json = json.dumps({'ignore': '%s' % ignore})
+					prev_ignores.save()
+	
 					terms = request.POST.get('terms',False)
 					new_accounts = ['%s' % terms]
 
@@ -659,7 +663,8 @@ def moderation_search(request):
 				report_status.json = json.dumps(rs_json)
 				report_status.save()
 
-				try:
+				if True:
+#				try:
 					for account in new_accounts:
 						if account.lower() in ignore_accounts:
 							print "Ignoring account %s" % account
@@ -768,7 +773,8 @@ def moderation_search(request):
 					rs_json['report_active'] = False
 					report_status.json = json.dumps(rs_json)
 					report_status.save()
-				except Exception,e:
+				else:
+#				except Exception,e:
 					print "Report failed: %s" % e
 					rs_json['report_active'] = False
 					report_status.json = json.dumps(rs_json)

@@ -119,19 +119,8 @@
 			});
 			{% endif %}
 			{% if perms.diablo2.moderation_investigate_report %}
-			function update_tags(elem,elem_tags){
-				var report_ignore = [{% for a in report_ignore %}'{{ a }}'{% if not forloop.last %},{% endif %}{% endfor %}];
-				$('.tag',elem_tags).each(function(){
-					if($(this).text().search(new RegExp('\\b(' + report_ignore.join('|') + ')\\b')) >= 0){
-						$(this).css('background-color','#1479B8');
-					}
-				});
-			}
                		$('#report_ignore_tags').tagsInput({
 	                	width: 'auto',
-				onChange: update_tags,
-				onAddTag: update_tags,
-				onRemoveTag: update_tags,
 				defaultText: '+Exclude'
                		});
 			$('.report-generate').click(function(event){
@@ -347,7 +336,7 @@
                                         				</div>
 									<div class="col-md-12">
 										<div class="input-group col-xs-9">
-											<input id="report_ignore_tags" type="text" class="tags form-control" value="{% for a in report_ignore %}{{ a }}{% if not forloop.last %},{% endif %}{% endfor %}" />
+											<input id="report_ignore_tags" type="text" class="tags form-control" value="{{ report_ignore }}" />
 										</div>
 									</div>
 									<div class="col-md-12">
