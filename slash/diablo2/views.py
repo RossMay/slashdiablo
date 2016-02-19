@@ -607,6 +607,7 @@ def moderation_search(request):
 
 				if report_id:
 					report = Report.objects.get(id=int(report_id))
+					ignore = report.ignores
 					log = LookupLog(user=request.user,type='report-continue',target=report_id,query='',parsed_query='',results=0)
 					
 					new_accounts = []
@@ -638,7 +639,7 @@ def moderation_search(request):
 					if re.match('\d+\.\d+\.\d+\.\d+',term):
 						ignore_ips.append(term)
 					else:
-						ignore_accounts.append(term)
+						ignore_accounts.append(term.lower())
 
 				log.save()
 
@@ -660,7 +661,7 @@ def moderation_search(request):
 
 				try:
 					for account in new_accounts:
-						if account in ignore_accounts:
+						if account.lower() in ignore_accounts:
 							print "Ignoring account %s" % account
 							continue
 						if account in accounts:
@@ -675,6 +676,8 @@ def moderation_search(request):
 								continue
 							elif entry.ip not in ips:
 								if entry.ip not in new_ips:
+									if entry.ip in ignore_ips:
+										continue
 									new_ips.append(entry.ip)
 									current_ips.append(entry.ip)
 									print "New IP %s" % entry.ip
@@ -703,6 +706,8 @@ def moderation_search(request):
 								continue
 							elif entry.account_name not in accounts:
 								if entry.account_name not in new_accounts:
+									if entry.account_name.lower() in ignore_accounts:
+										continue
 									new_accounts.append(entry.account_name)
 									current_accounts.append(entry.account_name)
 									print "New account %s" % entry.account_name

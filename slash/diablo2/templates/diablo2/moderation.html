@@ -171,6 +171,11 @@
 
 
 						$('#report-results').prepend(results);
+						new PNotify({
+							title: 'Report Generated',
+							text: 'Report for ' + message.query + ' was generated successfully',
+							type: 'success'
+						});
 					}else{
 						new PNotify({
 							title: message.title,
@@ -183,6 +188,8 @@
 			});
 			$('#i-report-tab').on('click', '.report-continue', function(event){
 				event.preventDefault();
+				$('i',this).addClass('fa-spin');
+				$(this).addClass('disabled');
 				$.ajax({
 					method: "POST",
 					beforeSend: function(request){
@@ -215,6 +222,11 @@
 
 
 						$('#report-'+message.reportid).html(results);
+						new PNotify({
+							title: 'Report Updayed',
+							text: 'Report for '+ message.query + ' was updated successfully',
+							type: 'success'
+						});
 					}else{
 						new PNotify({
 							title: message.title,
