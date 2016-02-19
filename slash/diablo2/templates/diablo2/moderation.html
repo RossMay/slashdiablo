@@ -142,7 +142,7 @@
 						if (message.final){
 							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button></small></h2>';
 						}else{
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button></small></h2>';
 						}
 						results = $('<div class="row" id="report-'+ message.reportid +'">'+
 								'<div class="col-md-12">'+
@@ -193,9 +193,9 @@
 				}).done(function(message){
 					if (message.success){
 						if (message.final){
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button></small></h2>';
 						}else{
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button></small></h2>';
 						}
 						results = $('<div class="col-md-12">'+
 								'<div class="x_panel">'+
@@ -212,8 +212,57 @@
 
 						$('#report-'+message.reportid).html(results);
 						new PNotify({
-							title: 'Report Updayed',
+							title: 'Report Updated',
 							text: 'Report for '+ message.query + ' was updated successfully',
+							type: 'success'
+						});
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
+			$('#i-report-tab').on('click', '.report-finalize', function(event){
+				event.preventDefault();
+				$('i',this).addClass('fa-spin');
+				$(this).addClass('disabled');
+				$('.report-continue',$(this).parent()).remove();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'report',
+						reportid: $(this).attr('name'),
+						finalize: true
+					}
+				}).done(function(message){
+					if (message.success){
+						var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button></small></h2>';
+						results = $('<div class="col-md-12">'+
+								'<div class="x_panel">'+
+									'<div class="x_title">'+
+										title +
+										'<div class="clearfix"></div>'+
+									'</div>'+
+									'<div class="x_content">'+
+										message.result+
+									'</div>'+
+								'</div>'+
+							'</div>');
+
+
+						$('#report-'+message.reportid).html(results);
+						new PNotify({
+							title: 'Report Finalized',
+							text: 'Report for '+ message.query + ' was finalized',
 							type: 'success'
 						});
 					}else{

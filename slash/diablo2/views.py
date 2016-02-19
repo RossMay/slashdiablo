@@ -13,7 +13,7 @@ from base.models import Variable
 
 from . import tasks
 
-import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess,random
+import MySQLdb,pytz,os,json,datetime,re,pysftp,subprocess,random,md5
 
 def premium(request):
 	return render(request,'diablo2/premium.html',{})
@@ -289,7 +289,7 @@ def moderation_search(request):
 				
 				db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 				cur = db.cursor()
-				cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where %s" % query)
+				cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip,acct_passhash1 FROM BNET where %s" % query)
 
 
 				results = ''
@@ -308,11 +308,13 @@ def moderation_search(request):
 						'commandgroups': row[6],
 						'time': datetime.datetime.fromtimestamp(row[7]),
 						'ip': row[8],
+						'pass': md5.new(row[9]).hexdigest()
 					}
 
-					results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+					results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
 								entry['name'],
 								entry['email'],
+								entry['pass'],
 								entry['id'],
 								entry['admin'],
 								entry['operator'],
@@ -332,6 +334,7 @@ def moderation_search(request):
 								<tr>
 									<th>Account</th>
 									<th>Email</th>
+									<th>Password (Obscured)</th>
 									<th>User ID</th>
 									<th>Admin</th>
 									<th>Operator</th>
@@ -590,8 +593,8 @@ def moderation_search(request):
 
 				report_status,created = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username, defaults={'json': '{}'})
 				rs_json = json.loads(report_status.json)
-				if rs_json.get('report_active',False):
-					return JsonResponse({'success': False, 'message': 'You already have a running report. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
+#				if rs_json.get('report_active',False):
+#					return JsonResponse({'success': False, 'message': 'You already have a running report. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
 
 				report_id = request.POST.get('reportid',False)
 		
@@ -604,6 +607,8 @@ def moderation_search(request):
 				new_ips = []
 
 				ignore = re.sub('[^\w_\-\[\]\,\.]','',request.POST.get('ignore',''))
+
+				final = request.POST.get('finalize',False)
 
 				if report_id:
 					report = Report.objects.get(id=int(report_id))
@@ -648,16 +653,10 @@ def moderation_search(request):
 				log.save()
 
 
-				if not report_id:
-					content =     '''=====================================================================<br/>
-							Generating list of accounts and IPs associated with *%s<br/>
-							=====================================================================<br/><br/>
-							Ignoring IPs<br/>%s<br/><br/>Ignoring Accounts<br/>%s<br/><br/>''' % (terms,'<br/>'.join(ignore_ips),'<br/>'.join(ignore_accounts))
-
+				if report_id:
+					content = content = report.results
 				else:
-					content = report.results +  '''=====================================================================<br/>
-								Checking again for all new IPs and Accounts</br>
-								=====================================================================<br/>'''
+					content = ''
 
 				rs_json['report_active'] = True
 				report_status.json = json.dumps(rs_json)
@@ -665,96 +664,275 @@ def moderation_search(request):
 
 				if True:
 #				try:
-					for account in new_accounts:
-						if account.lower() in ignore_accounts:
-							print "Ignoring account %s" % account
-							continue
-						if account in accounts:
-							print "Already searched account %s" % account
-							continue
-						print "Searching for IPs by account %s" % account
-	
-						entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
-						current_ips = []
-						for entry in entries:
-							if entry.ip in current_ips:
+					if not final:
+						for account in new_accounts:
+							if account.lower() in ignore_accounts:
+								print "Ignoring account %s" % account
 								continue
-							elif entry.ip not in ips:
-								if entry.ip not in new_ips:
-									if entry.ip in ignore_ips:
-										continue
-									new_ips.append(entry.ip)
-									current_ips.append(entry.ip)
-									print "New IP %s" % entry.ip
-								else:
+							if account in accounts:
+								print "Already searched account %s" % account
+								continue
+							print "Searching for IPs by account %s" % account
+		
+							entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
+							current_ips = []
+							for entry in entries:
+								if entry.ip in current_ips:
+									continue
+								elif entry.ip not in ips:
+									if entry.ip not in new_ips:
+										if entry.ip in ignore_ips:
+											continue
+										new_ips.append(entry.ip)
+										current_ips.append(entry.ip)
+										print "New IP %s" % entry.ip
+									else:
+										current_ips.append(entry.ip)
+										print 'Already checked %s' % entry.ip
+								elif entry.ip not in current_ips:
 									current_ips.append(entry.ip)
 									print 'Already checked %s' % entry.ip
-							elif entry.ip not in current_ips:
-								current_ips.append(entry.ip)
-								print 'Already checked %s' % entry.ip
+			
+							accounts.append(account)
 		
-						accounts.append(account)
-	
-					new_accounts = []
-					for ip in new_ips:
-						if ip in ignore_ips:
-							print "Ignoring IP %s" % ip
-							continue
-						if ip in ips:
-							print "Already Searched %s" % ip
-							continue
-						print "Searching for accounts by IP %s" % ip
-						entries = GameserverLog.objects.filter(ip=ip).only('account_name')
-						current_accounts = []
-						for entry in entries:
-							if entry.account_name in current_accounts:
+						new_accounts = []
+						for ip in new_ips:
+							if ip in ignore_ips:
+								print "Ignoring IP %s" % ip
 								continue
-							elif entry.account_name not in accounts:
-								if entry.account_name not in new_accounts:
-									if entry.account_name.lower() in ignore_accounts:
-										continue
-									new_accounts.append(entry.account_name)
-									current_accounts.append(entry.account_name)
-									print "New account %s" % entry.account_name
-								else:
+							if ip in ips:
+								print "Already Searched %s" % ip
+								continue
+							print "Searching for accounts by IP %s" % ip
+							entries = GameserverLog.objects.filter(ip=ip).only('account_name')
+							current_accounts = []
+							for entry in entries:
+								if entry.account_name in current_accounts:
+									continue
+								elif entry.account_name not in accounts:
+									if entry.account_name not in new_accounts:
+										if entry.account_name.lower() in ignore_accounts:
+											continue
+										new_accounts.append(entry.account_name)
+										current_accounts.append(entry.account_name)
+										print "New account %s" % entry.account_name
+									else:
+										current_accounts.append(entry.account_name)
+										print "Already searched %s" % entry.account_name
+								elif entry.account_name not in current_accounts:
 									current_accounts.append(entry.account_name)
 									print "Already searched %s" % entry.account_name
-							elif entry.account_name not in current_accounts:
-								current_accounts.append(entry.account_name)
-								print "Already searched %s" % entry.account_name
-						ips.append(ip)
-	
-					final = len(new_accounts) == 0
+							ips.append(ip)
+		
+					final = final or len(new_accounts) == 0
 					if final:
-						print "No new accounts, ending"
-						content = content +  '''=====================================================================<br/>
-									No additional IPs or accounts</br>
-									=====================================================================<br/>'''
+						content = content +  '''<table class='table table-bordered'>
+                                                                        <thead>
+                                                                                <tr>
+                                                                                        <th>Finalizing Report after %s rounds</th>
+                                                                                </tr>
+                                                                        </thead>
+	                                                                </table>''' % (report.depth if report_id else 1)
 					else:
-						content = content +  '''=====================================================================<br/>
-									New IP and Account Summary<br/>
-									=====================================================================<br/>
-									New IPs tied to accounts<br/><br/>
-									%s<br/><br/>
-									New Accounts tied to ips<br/><br/>
-									%s<br/>''' % ('<br/>'.join(new_ips),'<br/>'.join(new_accounts))
+						content = content +  '''<table class='table table-bordered'>
+                                                                        <thead>
+                                                                                <tr>
+                                                                                        <th colspan=2>New IP and Accounts for Round %s</th>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                        <th>IPs</th>
+                                                                                        <th>Accounts</th>
+                                                                                </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                                <tr>
+                                                                                        <td>%s</td>
+                                                                                        <td>%s</td>
+                                                                                </tr>
+                                                                        </tbody>
+                                                                </table>''' % (report.depth + 1 if report_id else 1,'<br/>'.join(new_ips),'<br/>'.join(new_accounts))
 	
 					new_ips = []
 	
-					summary = 	     '''=====================================================================<br/>
-								Final IP and Account Summary<br/>
-								=====================================================================<br/>
-								IPs tied to accounts<br/><br/>
-								%s<br/><br/>
-								Accounts tied to ips<br/><br/>
-								%s<br/><br/>''' % ('<br/>'.join(ips),'<br/>'.join(accounts+new_accounts))
+					summary = 	     '''<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th colspan=3>Final IP and Account Summary</th>
+										</tr>
+										<tr>
+											<th>IPs</th>
+											<th>Accounts</th>
+											<th>Ignoring</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>%s</td>
+											<td>%s</td>
+											<td>%s</td>
+										</tr>
+									</tbody>
+								</table>''' % ('<br/>'.join(ips),'<br/>'.join(accounts+new_accounts),'<br/>'.join(ignore_ips+ignore_accounts))
 	
 					if final:
-						#Print db results for each account username,pass,email,ip, logintime, lock
-						#Print list of accounts with matching lastlogin ip
-						#Print list of accounts with matching passhash
-						#print list of accounts with matching emails
-						pass
+
+						db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
+						cur = db.cursor()
+						cur.execute("SELECT acct_username,acct_email,acct_passhash1,auth_lockk,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_lastlogin_ip in (%s) ORDER BY acct_lastlogin_ip, acct_username" % ','.join('"{0}"'.format(i) for i in ips))
+
+
+						db_ips = ''
+						count = 0
+
+						for row in cur.fetchall():
+							if not row[0]:
+								continue
+							entry = {
+								'name': row[0],
+								'email': row[1],
+								'pass': row[2],
+								'locked': True if row[3].lower() == "true" else False,
+								'time': datetime.datetime.fromtimestamp(row[4]),
+								'ip': row[5]
+							}
+
+							db_ips = db_ips + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+										entry['name'],
+										entry['email'],
+										md5.new(entry['pass']).hexdigest(),
+										entry['locked'],
+										entry['time'],
+										entry['ip']
+									)
+							count = count +1
+						
+						if not count:
+							db_ips = '<tr><td colspan=6>No results for matching IPs</td></tr>'
+	
+						db_ips = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th colspan=6>Accounts with matching lastlogin_ip</th>
+										</tr>
+										<tr>
+											<th>Account</th>
+											<th>Email</th>
+											<th>Password (Obscured)</th>
+											<th>Locked</th>
+											<th>Last Login</th>
+											<th>Last Login IP</th>
+										</tr>
+									</thead>
+									<tbody>
+										%s
+									</tbody>
+								</table>
+							''' % db_ips
+						content = content + db_ips
+
+						cur.execute("SELECT acct_username,acct_email,acct_passhash1,auth_lockk,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_passhash1 in (SELECT acct_passhash1 from BNET where acct_username in (%s)) ORDER BY acct_passhash1, acct_username" % ','.join('"{0}"'.format(a) for a in accounts+new_accounts))
+
+
+						db_pass = ''
+						count = 0
+
+						for row in cur.fetchall():
+							if not row[0]:
+								continue
+							entry = {
+								'name': row[0],
+								'email': row[1],
+								'pass': row[2],
+								'locked': True if row[3].lower() == "true" else False,
+								'time': datetime.datetime.fromtimestamp(row[4]),
+								'ip': row[5],
+							}
+
+							db_pass = db_pass + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+										entry['name'],
+										entry['email'],
+										md5.new(entry['pass']).hexdigest(),
+										entry['locked'],
+										entry['time'],
+										entry['ip']
+									)
+							count = count +1
+						
+						if not count:
+							db_pass = '<tr><td colspan=6>No results for matching passwords</td></tr>'
+	
+						db_pass = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th colspan=6>Accounts with matching passwords</th>
+										</tr>
+										<tr>
+											<th>Account</th>
+											<th>Email</th>
+											<th>Password (Obscured)</th>
+											<th>Locked</th>
+											<th>Last Login</th>
+											<th>Last Login IP</th>
+										</tr>
+									</thead>
+									<tbody>
+										%s
+									</tbody>
+								</table>
+							''' % db_pass
+						content = content + db_pass
+
+						cur.execute("SELECT acct_username,acct_email,acct_passhash1,auth_lockk,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where acct_email in (SELECT acct_email from BNET where acct_username in (%s) and acct_email != '') ORDER BY acct_email, acct_username" % ','.join('"{0}"'.format(a) for a in accounts+new_accounts))
+
+
+						db_email = ''
+						count = 0
+
+						for row in cur.fetchall():
+							if not row[0]:
+								continue
+							entry = {
+								'name': row[0],
+								'email': row[1],
+								'pass': row[2],
+								'locked': True if row[3].lower() == "true" else False,
+								'time': datetime.datetime.fromtimestamp(row[4]),
+								'ip': row[5],
+							}
+
+							db_email = db_email + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+										entry['name'],
+										entry['email'],
+										md5.new(entry['pass']).hexdigest(),
+										entry['locked'],
+										entry['time'],
+										entry['ip']
+									)
+							count = count +1
+						
+						if not count:
+							db_email = '<tr><td colspan=6>No results for matching email addresses</td></tr>'
+	
+						db_email = '''	<table class='table table-bordered'>
+									<thead>
+										<tr>
+											<th colspan=6>Accounts with matching email addresses</th>
+										</tr>
+										<tr>
+											<th>Account</th>
+											<th>Email</th>
+											<th>Password (Obscured)</th>
+											<th>Locked</th>
+											<th>Last Login</th>
+											<th>Last Login IP</th>
+										</tr>
+									</thead>
+									<tbody>
+										%s
+									</tbody>
+								</table>
+							''' % db_email
+						content = content + db_email
 	
 					if not report_id:
 						report = Report(user = request.user,
