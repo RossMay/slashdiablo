@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Slash Gaming - Diablo2{% endblock %}
+
+{% block content %}
+        <div class="">
+                <div class="page-title">
+                        <div class="title_left">
+                                <h3>Diablo2 <small>Action Details</small></h3>
+                        </div>
+                </div>
+                <div class="clearfix"></div>
+                <div class="row">
+			<div class="col-md-12">
+                                <div class="x_panel">
+                                        <div class="x_title">
+                                                <h2><i class="fa fa-gavel"></i> Action<small>{{ action.action }}</small></h2>
+                                                <ul class="nav navbar-right panel_toolbox">
+                                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                                                </ul>
+                                                <div class="clearfix"></div>
+                                        </div>
+                                        <div class="x_content action_log">
+						<div class="row">
+	                                                <div class="col-xs-1">
+								<strong>User</strong>
+							</div>
+							<div class="col-xs-10">
+								{% if action.user %}{{ action.user.username }}{% else %}Command Line{% endif %}
+							</div>
+						</div>
+						<div class="row">
+	                                                <div class="col-xs-1">
+								<strong>Date</strong>
+							</div>
+							<div class="col-xs-10">
+								{{ action.date }}
+							</div>
+						</div>
+						<div class="row">
+	                                                <div class="col-xs-1">
+								<strong>Action</strong>
+							</div>
+							<div class="col-xs-10">
+								{{ action.action }}
+							</div>
+						</div>
+						<div class="row">
+	                                                <div class="col-xs-1">
+								<strong>Target</strong>
+							</div>
+							<div class="col-xs-10">
+								{{ action.target }}
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+{% endblock %}

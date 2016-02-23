@@ -6354,3 +6354,10 @@ ul.notifications {
 div.col-md-12-main{
 	float:none;
 }
+
+.action_log div.col-xs-1{
+	text-align:right;
+}
+ .rotate-180{
+	transform: rotate(180deg);
+}

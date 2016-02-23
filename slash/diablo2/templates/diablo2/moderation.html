@@ -4,8 +4,72 @@
 
 {% block extra-scripts %}
 	<script src="/media/theme/js/tags/jquery.tagsinput.min.js"></script>
+        <script src="/media/theme/js/datatables/js/jquery.dataTables.js"></script>
+        <script src="/media/theme/js/datatables/tools/js/dataTables.tableTools.js"></script>
 	<script>
 		$(document).ready(function(){
+
+			{% if perms.diablo2.moderation_history_report %}
+                	var asInitVals = new Array();
+        	        $(document).ready(function () {
+	                        var oTable = $('#report_list').dataTable({
+                                                	        "oLanguage": {
+                                        	                        "sSearch": "Search all columns:"
+                                	                        },
+                        	                                'iDisplayLength': 12,
+                	                                        "sPaginationType": "full_numbers",
+								"aaSorting": [[ 2, "desc" ]],
+        	                                                "dom": 'lfrtip'
+	                                        });
+	                        var oTable = $('#lookup_list').dataTable({
+                                                	        "oLanguage": {
+                                        	                        "sSearch": "Search all columns:"
+                                	                        },
+                        	                                'iDisplayLength': 12,
+                	                                        "sPaginationType": "full_numbers",
+								"aaSorting": [[ 2, "desc" ]],
+        	                                                "dom": 'lfrtip'
+	                                        });
+	                        var oTable = $('#action_list').dataTable({
+                                                	        "oLanguage": {
+                                        	                        "sSearch": "Search all columns:"
+                                	                        },
+                        	                                'iDisplayLength': 12,
+                	                                        "sPaginationType": "full_numbers",
+								"aaSorting": [[ 2, "desc" ]],
+        	                                                "dom": 'lfrtip'
+	                                        });
+                        	$("tfoot input").keyup(function () {
+                	                oTable.fnFilter(this.value, $("tfoot th").index($(this).parent()));
+        	                });
+	                        $("tfoot input").each(function (i) {
+                        	        asInitVals[i] = this.value;
+                	        });
+        	                $("tfoot input").focus(function () {
+	                                if (this.className == "search_init") {
+                                        	this.className = "";
+                                	        this.value = "";
+                        	        }
+                	        });
+        	                $("tfoot input").blur(function (i) {
+	                                if (this.value == "") {
+                                        	this.className = "search_init";
+                                	        this.value = asInitVals[$("tfoot input").index(this)];
+                        	        }
+                	        });
+        	        });
+			{% endif %}
+			$('.pwshow').click(function(event){
+				event.preventDefault();
+				var parent = $(this).parent().parent();
+				if ($('input',parent).attr('type') == 'text'){
+					$('input',parent).attr('type','password');
+					$(this).text('Show');
+				}else{
+					$('input',parent).attr('type','text');
+					$(this).text('Hide');
+				}
+			});
 
 			{% if perms.diablo2.moderation_investigate %}
 			{% if perms.diablo2.log_sync %}
@@ -63,6 +127,61 @@
 
 
 						$('#db-search-results').prepend(results);
+						new PNotify({
+							title: 'Lookup Complete',
+							text: 'Lookup of ' + message.query + ' was completed',
+							type: 'success'
+						});
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_charname %}
+			$('.charname-search').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'charname',
+						target: 'file',
+						terms: $('#charname_query').val()
+					}
+				}).done(function(message){
+					if (message.success){
+						results = $('<div class="row">'+
+								'<div class="col-md-12">'+
+									'<div class="x_panel">'+
+										'<div class="x_title">'+
+											'<h2>Account Lookup<small>' + message.query+' <a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/lookup/'+ message.logid +'">Permalink</a></small></h2>'+
+											'<div class="clearfix"></div>'+
+										'</div>'+
+										'<div class="x_content">'+
+											message.result+
+										'</div>'+
+									'</div>'+
+								'</div>',+
+							'</div>');
+
+
+						$('#charname-results').prepend(results);
+						new PNotify({
+							title: 'Account Lookup Complete',
+							text: 'Account lookup for ' + message.query + ' was completed',
+							type: 'success'
+						});
+
 					}else{
 						new PNotify({
 							title: message.title,
@@ -95,7 +214,7 @@
 								'<div class="col-md-12">'+
 									'<div class="x_panel">'+
 										'<div class="x_title">'+
-											'<h2>'+message.count + ' Results<small>' + message.query+'</small></h2>'+
+											'<h2>'+message.count + ' Results<small>' + message.query+' <a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/lookup/'+ message.logid +'">Permalink</a></small></h2>'+
 											'<div class="clearfix"></div>'+
 										'</div>'+
 										'<div class="x_content">'+
@@ -103,10 +222,14 @@
 										'</div>'+
 									'</div>'+
 								'</div>',+
-							'</div>');
-
-
+						'</div>');
 						$('#log-search-results').prepend(results);
+						new PNotify({
+							title: 'Lookup Complete',
+							text: 'Lookup of ' + message.query + ' was completed',
+							type: 'success'
+						});
+
 					}else{
 						new PNotify({
 							title: message.title,
@@ -140,9 +263,9 @@
 				}).done(function(message){
 					if (message.success){
 						if (message.final){
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs">Final</button><a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/report/'+ message.reportid +'">Permalink</a></small></h2>';
 						}else{
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button><a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/report/'+ message.reportid +'">Permalink</a></small></h2>';
 						}
 						results = $('<div class="row" id="report-'+ message.reportid +'">'+
 								'<div class="col-md-12">'+
@@ -193,9 +316,9 @@
 				}).done(function(message){
 					if (message.success){
 						if (message.final){
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button><a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/report/'+ message.reportid +'">Permalink</a></small></h2>';
 						}else{
-							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button></small></h2>';
+							var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-info btn-xs report-continue" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Continue</button> <button class="btn btn-default btn-xs report-finalize" href="#" name="' + message.reportid + '"><i class="fa fa-refresh"> </i> Finalize</button><a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/report/'+ message.reportid +'">Permalink</a></small></h2>';
 						}
 						results = $('<div class="col-md-12">'+
 								'<div class="x_panel">'+
@@ -245,7 +368,7 @@
 					}
 				}).done(function(message){
 					if (message.success){
-						var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button></small></h2>';
+						var title = '<h2>Report for ' + message.query + '<small>Depth '+message.depth+'</small><small> <button class="btn btn-success btn-xs disabled">Final</button><a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/report/'+ message.reportid +'">Permalink</a></small></h2>';
 						results = $('<div class="col-md-12">'+
 								'<div class="x_panel">'+
 									'<div class="x_title">'+
@@ -307,6 +430,7 @@
 								{% if perms.diablo2.moderation_investigate_database %}<li><a href="#i-db-tab" data-toggle="tab">Database</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_logs %}<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_report %}<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_charname %}<li><a href="#i-charname-tab" data-toggle="tab">Account Lookup</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-10">
@@ -390,6 +514,23 @@
 									</div>
 									<div class="col-md-12">
 										<div id="report-results"></div>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_charname %}
+								<div class="tab-pane" id="i-charname-tab">
+									<div class="col-md-12">
+										<p class="lead">Character Account lookup</p>
+										<p>Lookup the account name for a character</p>
+				                                                <div class="input-group col-xs-9">
+											<input id='charname_query' type="text" class="form-control" aria-label="Character Name">
+											<div class="input-group-btn">
+												<button type="button" class="charname-search btn btn-primary">Find</button>
+											</div>
+										</div>
+                                        				</div>
+									<div class="col-md-12">
+										<div id="charname-results"></div>
 									</div>
 								</div>
 								{% endif %}
@@ -536,38 +677,265 @@
 					<div class="x_content">
 						<div class="col-xs-2">
 							<ul class="nav nav-tabs tabs-left">
-								<li class="active"><a href="#h-gs-tab" data-toggle="tab">Gameserver Log</a></li>
-								<li><a href="#h-report-tab" data-toggle="tab">Reports</a></li>
-								<li><a href="#h-lookup-tab" data-toggle="tab">Lookups</a></li>
-								<li><a href="#h-action-tab" data-toggle="tab">Action</a></li>
+								{% if perms.diablo2.moderation_history_report %}<li class="active"><a href="#h-report-tab" data-toggle="tab">Reports</a></li>{% endif %}
+								{% if perms.diablo2.moderation_history_lookup %}<li><a href="#h-lookup-tab" data-toggle="tab">Lookups</a></li>{% endif %}
+								{% if perms.diablo2.moderation_history_action %}<li><a href="#h-action-tab" data-toggle="tab">Action</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-10">
 							<div class="tab-content">
-								<div class="tab-pane active" id="h-gs-tab">
-									<p class="lead">Gamserver Log</p>
-									<p>
-										Gameserver log
-									</p>
+								{% if perms.diablo2.moderation_history_report %}
+								<div class="tab-pane active" id="h-report-tab">
+									<div class="col-md-12">
+										<p class="lead">Report History</p>
+										<p>List of all previously run reports</p>
+										<div class="input-group col-xs-10">
+											<table id="report_list" class="table table-striped responsive-utilities jambo_table">
+				                                                	        <thead>
+				                                                        	        <tr class="headings">
+				                                                                	        <th>Target </th>
+                                				                                        	<th>User </th>
+	                                                                				        <th>Date </th>
+        	                        				                                        <th class="last">Final </th>
+                	                                                				</tr>
+					                                                        </thead>
+                                					                        <tbody>
+                                        	                        				{% for report in reports %}
+				                	                                                <tr class="{% cycle 'odd' 'even' %} pointer">
+                                					                                        <td class=" "><a href="{% url 'moderation_report' report.id %}" target="_blank">{{ report.target }}</a></td>
+                                                                					        <td class=" ">{{ report.user.username }}</td>
+                                				        	                                <td class=" "><span style="display:none;">{{ report.date|date:"Y/m/d H:i" }}</span>{{ report.date }}</td>
+                                                                					        <td class=" last">{{ report.active|yesno|capfirst }}</td>
+				                                                        	        </tr>
+                                				                                	{% endfor %}
+					                                                        </tbody>	
+        	                        				                </table>
+										</div>
+									</div>
 								</div>
-								<div class="tab-pane" id="h-report-tab">
-									<p class="lead">Reports</p>
-									<p>
-										Previously run reports
-									</p>
-								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_history_lookup %}
 								<div class="tab-pane" id="h-lookup-tab">
-									<p class="lead">Lookups</p>
-									<p>
-										Previous results of lookups
-									</p>
+									<div class="col-md-12">
+										<p class="lead">Lookup Log</p>
+										<p>List of all previous lookups</p>
+										<div class="input-group col-xs-10">
+											<table id="lookup_list" class="table table-striped responsive-utilities jambo_table">
+				                                                	        <thead>
+				                                                        	        <tr class="headings">
+				                                                                	        <th>Source </th>
+                                				                                        	<th>Type </th>
+	                                                                				        <th>Date </th>
+	                                                                				        <th>Query </th>
+	                                                                				        <th>Results </th>
+        	                        				                                        <th class="last">User </th>
+                	                                                				</tr>
+					                                                        </thead>
+                                					                        <tbody>
+                                        	                        				{% for lookup in lookups %}
+				                	                                                <tr class="{% cycle 'odd' 'even' %} pointer">
+                                					                                        <td class=" "><a href="{% url 'moderation_lookup' lookup.id %}" target="_blank">{{ lookup.type }}</a></td>
+                                					                                        <td class=" ">{{ lookup.target }}</td>
+                                				        	                                <td class=" "><span style="display:none;">{{ lookup.date|date:"Y/m/d H:i" }}</span>{{ lookup.date }}</td>
+                                                                					        <td class=" ">{{ lookup.query }}</td>
+                                                                					        <td class=" ">{{ lookup.num_results }}</td>
+                                                                					        <td class=" last">{{ lookup.user.username }}</td>
+				                                                        	        </tr>
+                                				                                	{% endfor %}
+					                                                        </tbody>	
+        	                        				                </table>
+										</div>
+									</div>
 								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_history_action %}
 								<div class="tab-pane" id="h-action-tab">
-									<p class="lead">Action</p>
-									<p>
-										List of previous preformed actions by mods
-									</p>
+									<div class="col-md-12">
+										<p class="lead">Action Log</p>
+										<p>View previous actions by users</p>
+										<div class="input-group col-xs-10">
+											<table id="action_list" class="table table-striped responsive-utilities jambo_table">
+				                                                	        <thead>
+				                                                        	        <tr class="headings">
+				                                                                	        <th>Action </th>
+                                				                                        	<th>Target </th>
+	                                                                				        <th>Date </th>
+        	                        				                                        <th class="last">User </th>
+                	                                                				</tr>
+					                                                        </thead>
+                                					                        <tbody>
+                                        	                        				{% for action in actions %}
+				                	                                                <tr class="{% cycle 'odd' 'even' %} pointer">
+                                					                                        <td class=" "><a href="{% url 'moderation_action' action.id %}" target="_blank">{{ action.action }}</a></td>
+                                                                					        <td class=" "><span data-toggle="tooltip" data-placement="bottom" title="" data-original-title="{{action.target}}">{{ action.target|truncatechars:100 }}</span></td>
+                                				        	                                <td class=" "><span style="display:none;">{{ action.date|date:"Y/m/d H:i" }}</span>{{ action.date }}</td>
+                                                                					        <td class=" last">{% if action.user %}{{ action.user.username }}{% else %}Command Line{% endif %}</td>
+				                                                        	        </tr>
+                                				                                	{% endfor %}
+					                                                        </tbody>	
+        	                        				                </table>
+										</div>
+									</div>
 								</div>
+								{% endif %}
+							</div>
+						</div>
+						<div class="clearfix"></div>
+					</div>
+				</div>
+			</div>	
+		</div>
+		{% endif %}
+		{% if perms.diablo2.moderation_passwords %}
+                <div class="row">
+			<div class="col-md-12">
+				<div class="x_panel">
+					<div class="x_title">
+						<h2><i class="fa fa-key"></i> Accounts <small>Access information</small></h2>
+						<ul class="nav navbar-right panel_toolbox">
+		                                        <li class="right-tool"><a class="collapse-link"><i class="fa fa-chevron-up"></i></a></li>
+                		                </ul>
+						<div class="clearfix"></div>
+					</div>
+					<div class="x_content">
+						<div class="col-xs-2">
+							<ul class="nav nav-tabs tabs-left">
+								<li class="active"><a href="#p-main-tab" data-toggle="tab">Accounts</a></li>
+								{% if perms.diablo2.moderation_passwords_telnet %}<li><a href="#p-telnet-tab" data-toggle="tab">Telnet</a></li>{% endif %}
+								{% if perms.diablo2.moderation_passwords_game %}<li><a href="#p-game-tab" data-toggle="tab">In Game</a></li>{% endif %}
+								{% if perms.diablo2.moderation_passwords_discord %}<li><a href="#p-discord-tab" data-toggle="tab">Discord</a></li>{% endif %}
+								{% if perms.diablo2.moderation_passwords_subreddit %}<li><a href="#p-subreddit-tab" data-toggle="tab">Subreddit</a></li>{% endif %}
+
+							</ul>
+						</div>
+						<div class="col-xs-10">
+							<div class="tab-content">
+								<div class="tab-pane active" id="p-main-tab">
+									<div class="input-group col-xs-9">
+										<p class="lead">Account Information</p>
+										<p>Select a section from the left to view associated account information.<br><i class="fa fa-3x fa-share rotate-180"></i></p>
+									</div>
+								</div>
+								{% if perms.diablo2.moderation_passwords_telnet %}
+								<div class="tab-pane" id="p-telnet-tab">
+									<div class="input-group col-xs-9">
+										<p class="lead">Telnet Access</p>
+										<p>Connect to telnet via a program such as PuTTY.</p>
+										<form class="form-horizontal form-label-left">
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Host</label>
+												<div class="col-md-6">
+													<input type="text" class="form-control" value="{{ accounts_telnet.ip }}">
+												</div>
+											</div>
+										</div>
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Port</label>
+												<div class="col-md-6">
+													<input type="text" class="form-control" value="{{ accounts_telnet.port }}">
+												</div>
+											</div>
+										</div>
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Password</label>
+												<div class="col-md-6">
+													<div class="input-group">
+														<input type="password" class="form-control" value="{{ accounts_telnet.password }}"><span class="input-group-btn"><button type="button" class="pwshow btn btn-primary">Show</button></span>
+													</div>
+												</div>
+											</div>
+										</div>
+										</form>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_passwords_game %}
+								<div class="tab-pane" id="p-game-tab">
+									<div class="input-group col-xs-9">
+										<p class="lead">In Game Moderator Account</p>
+										<p>Account to use in game for checking for bots and actions.</p>
+										<form class="form-horizontal form-label-left">
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Account</label>
+												<div class="col-md-6">
+													<input type="text" class="form-control" value="{{ accounts_game.username }}">
+												</div>
+											</div>
+										</div>
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Password</label>
+												<div class="col-md-6">
+													<div class="input-group">
+														<input type="password" class="form-control" value="{{ accounts_game.password }}"><span class="input-group-btn"><button type="button" class="pwshow btn btn-primary">Show</button></span>
+													</div>
+												</div>
+											</div>
+										</div>
+										</form>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_passwords_discord %}
+								<div class="tab-pane" id="p-discord-tab">
+									<div class="input-group col-xs-9">
+										<p class="lead">SlashDiablo Discord</p>
+										<p>Owner account for the SlashDiablo discord.</p>
+										<form class="form-horizontal form-label-left" autocomplete="false">
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Email</label>
+												<div class="col-md-6">
+													<input type="text" class="form-control" value="{{ accounts_discord.email }}">
+												</div>
+											</div>
+										</div>
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Password</label>
+												<div class="col-md-6">
+													<div class="input-group">
+														<input type="password" class="form-control" value="{{ accounts_discord.password }}"><span class="input-group-btn"><button type="button" class="pwshow btn btn-primary">Show</button></span>
+													</div>
+												</div>
+											</div>
+										</div>
+										</form>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_passwords_subreddit %}
+								<div class="tab-pane" id="p-subreddit-tab">
+									<div class="input-group col-xs-9">
+										<p class="lead">Subreddit Account</p>
+										<p>Info to log into the SlashDiablo subreddit owner.</p>
+										<form class="form-horizontal form-label-left">
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Username</label>
+												<div class="col-md-6">
+													<input type="text" class="form-control" value="{{ accounts_subreddit.username }}">
+												</div>
+											</div>
+										</div>
+										<div class="form-group">
+											<div class="col-md-12">
+												<label class="col-sm-1 control-label">Password</label>
+												<div class="col-md-6">
+													<div class="input-group">
+														<input type="password" class="form-control" value="{{ accounts_subreddit.password }}"><span class="input-group-btn"><button type="button" class="pwshow btn btn-primary">Show</button></span>
+													</div>
+												</div>
+											</div>
+										</div>
+										</form>
+									</div>
+								</div>
+								{% endif %}
 							</div>
 						</div>
 						<div class="clearfix"></div>

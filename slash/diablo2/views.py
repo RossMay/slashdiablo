@@ -1,13 +1,14 @@
 from django.db.models.query import QuerySet
-from django.shortcuts import render
+from django.shortcuts import render,get_object_or_404
 from django.contrib.auth.decorators import login_required,permission_required
 from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, Http404
 from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.core.cache import cache
 
-from .models import Account,Character,FailedLog,GameserverLog,LookupLog,Report
+from .models import Account,Character,FailedLog,GameserverLog,LookupLog,Report,ActionLog
 
 from base.models import Variable
 
@@ -21,14 +22,36 @@ def premium(request):
 @login_required
 def accounts(request):
 	account_sync_owner(request.user)
-	accounts = Account.objects.filter(owner=request.user)
+	accounts = cache.get('diablo2_accounts_%s' % request.user.id)
+	if not accounts:
+		accounts = Account.objects.filter(owner=request.user)
+		cache.set('diablo2_accounts_%s' % request.user.id,accounts,300)
+
 	return render(request,'diablo2/accounts.html',{'accounts':accounts})
 
 @login_required
 def characters(request):
 	sync_character_user(request.user)
-	characters = Character.objects.filter(account__owner=request.user)
+	characters = cache.get('diablo2_characters_%s' % request.user.id)
+	if not characters:
+		characters = Character.objects.filter(account__owner=request.user)
+		cache.set('diablo2_characters_%s' % request.user.id, characters,300)
 	return render(request,'diablo2/characters.html',{'characters':characters})
+
+@permission_required('diablo2.moderation_history_report')
+def moderation_report(request,reportid):
+	report = get_object_or_404(Report,id=reportid)	
+	return render(request,'diablo2/report.html',{'report':report})
+
+@permission_required('diablo2.moderation_history_action')
+def moderation_action(request,actionid):
+	action = get_object_or_404(ActionLog,id=actionid)	
+	return render(request,'diablo2/action.html',{'action':action})
+
+@permission_required('diablo2.moderation_history_lookup')
+def moderation_lookup(request,lookupid):
+	lookup = get_object_or_404(LookupLog,id=lookupid)	
+	return render(request,'diablo2/lookup.html',{'lookup':lookup})
 
 @permission_required('diablo2.moderation_enabled')
 @ensure_csrf_cookie
@@ -43,6 +66,32 @@ def moderation(request):
 
 	prev_ignores,created = Variable.objects.get_or_create(name = 'diablo2_report_ignore_%s' % request.user.username, defaults={'json': '{}'})
 	context['report_ignore'] = json.loads(prev_ignores.json).get('ignore','')
+
+	if request.user.has_perm('diablo2_moderation_history_report'):
+		reports = cache.get('diablo2_report_log')
+		if not reports:
+			reports = Report.objects.all()
+			cache.set('diablo2_report_log',reports,300)
+		context['reports'] = reports
+
+	if request.user.has_perm('diablo2_moderation_history_lookup'):
+		lookups = cache.get('diablo2_lookup_log')
+		if not lookups:
+			lookups = LookupLog.objects.all()
+			cache.set('diablo2_lookup_log',lookups,300)
+		context['lookups'] = lookups
+
+	if request.user.has_perm('diablo2_moderation_history_action'):
+		actions = cache.get('diablo2_action_log')
+		if not actions:
+			actions = ActionLog.objects.all()
+			cache.set('diablo2_action_log',actions,300)
+		context['actions'] = actions
+
+	if request.user.has_perm('diablo2.moderation_passwords_telnet'): context['accounts_telnet'] = json.loads(Variable.objects.get(name='diablo2_info_telnet').json)
+	if request.user.has_perm('diablo2.moderation_passwords_discord'): context['accounts_discord'] = json.loads(Variable.objects.get(name='diablo2_info_discord').json)
+	if request.user.has_perm('diablo2.moderation_passwords_game'): context['accounts_game'] = json.loads(Variable.objects.get(name='diablo2_info_game').json)
+	if request.user.has_perm('diablo2.moderation_passwords_subreddit'): context['accounts_subreddit'] = json.loads(Variable.objects.get(name='diablo2_info_subreddit').json)
 
 	return render(request,'diablo2/moderation.html',context)
 
@@ -73,17 +122,14 @@ def account_sync(query):
 				user = User.objects.get(email=entry['email'])
 				#Check verified user status
 			except User.DoesNotExist:
-				print "No user match!"
 				user = False
 
 		try:
 			account = Account.objects.get(name=entry['name'])
 			#update the account
-			print "Exists! - %s" % entry['name']
 		except Account.DoesNotExist:
 			account = Account(name=entry['name'],owner=user if user else None,user_id=entry['id'],admin=entry['admin'],operator=entry['operator'],locked=entry['locked'],commandgroups=entry['commandgroups'],lastlogin=timezone.make_aware(entry['time'],pytz.timezone('UTC')),lastlogin_ip=entry['ip'],status='B' if entry['locked'] else 'A',email=entry['email'])
 			account.save()
-			print "Doesnt exist! - %s" % entry['name']
 	db.close()
 	return True
 
@@ -166,11 +212,13 @@ def parse_character(owner,bytes):
 
 	try:
 		character = Character.objects.get(name=info['name'])
+		if character.checksum == info['checksum']:
+			return		
 		if character.account != owner:
-			print "New owner"
 			character.delete()
 			raise Character.DoesNotExist
 		character.level = info['level']
+		character.checksum = info['checksum']
 		character.cclass = info['class']
 		character.hardcore = info['hardcore']
 		character.has_died = info['died']
@@ -179,7 +227,6 @@ def parse_character(owner,bytes):
 		character.info = json.dumps(info)
 
 	except Character.DoesNotExist:
-		print "New Character %s" % info['name']
 		character = Character(
 				name=info['name'],
 				account = owner,
@@ -189,7 +236,8 @@ def parse_character(owner,bytes):
 				has_died = info['died'],
 				created = timezone.make_aware(datetime.datetime.fromtimestamp(int(info['timestamp'],16)),pytz.timezone('UTC')),
 				last_update = timezone.make_aware(datetime.datetime.now(),pytz.timezone('UTC')),
-				info = json.dumps(info)
+				info = json.dumps(info),
+				checksum = info['checksum']
 			)
 	character.save()
 
@@ -206,7 +254,6 @@ def sync_character(char,account):
 	try:
 		parse_character(account,bytes)
 	except Exception, e:
-		print "Failed to parse %s on %s - Probably hasn't logged in" % (char,account.name.lower())
 		return False
 	return True
 
@@ -235,7 +282,6 @@ def log_sync(request):
 	variable = Variable.objects.get(name='diablo2_log_sync_time')
 	last_update = datetime.datetime.strptime(variable.value,'%Y-%m-%d %H:%M:%S.%f')
 	minutes = int((datetime.datetime.now() - last_update).seconds) / 60
-	print minutes
 	if minutes > 5:
 		variable = Variable.objects.get(name='diablo2_log_sync_time')
 		variable.value = datetime.datetime.now()
@@ -257,7 +303,56 @@ def moderation_search(request):
 		action = request.POST.get('action',False)
 		if action == 'search':
 			source = request.POST.get('source',False)
-			if source == 'database':
+			if source == 'charname':
+				if not request.user.has_perm('diablo2.moderation_investigate_charname'):
+                                        return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+                                terms = request.POST.get('terms',False)
+
+				charname_status,created = Variable.objects.get_or_create(name = 'diablo2_charname_%s' % request.user.username, defaults={'json': '{}'})
+				cn_json = json.loads(charname_status.json)
+
+				if cn_json.get('charname_active',False):
+					return JsonResponse({'success': False, 'message': 'You already have a running lookup. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
+
+				parsed_terms = re.sub('[^\w_\-\[\]]','',terms).lower()
+				if not parsed_terms or not len(parsed_terms):
+					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
+
+				log = LookupLog(user=request.user,type=source,target='file',query=terms,parsed_query=parsed_terms,num_results=0)
+				log.save()
+				
+				print 'Looking for charname %s' % parsed_terms
+
+				cn_json['charname_active'] = True
+				charname_status.json = json.dumps(cn_json)
+				charname_status.save()
+
+				try:
+					ret = subprocess.check_output(['find /home/slashdiablo/pvpgn/var/charinfo/ -name %s -type f' % parsed_terms],shell=True)
+					match = re.match(r'/home/slashdiablo/pvpgn/var/charinfo/(?P<account>[\w_\-\[\]]+)/.*',ret)
+				except exception, e:
+					cn_json['charname_active'] = False
+					charname_status.json = json.dumps(cn_json)
+					charname_status.save()
+					raise e
+
+				if not match:
+					count = 0
+					result = 'No match for character %s' % terms
+				else:
+					count = 1
+					result = match.groupdict()['account']
+				
+				cn_json['charname_active'] = False
+				charname_status.json = json.dumps(cn_json)
+				charname_status.save()
+
+				log.num_results = count
+				log.results = result
+				log.save()
+
+                                return JsonResponse({'success': True, 'query': 'charname = %s' % terms, 'result': result, 'count':count, 'logid': log.id})
+			elif source == 'database':
 				if not request.user.has_perm('diablo2.moderation_investigate_database'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
 				target = request.POST.get('target',False)
@@ -284,7 +379,7 @@ def moderation_search(request):
 
 				short_query = '%s = %s' % (target_map[target],parsed_terms)
 
-				log = LookupLog(user=request.user,type=source,target=target_map[target],query=terms,parsed_query=query,results=0)
+				log = LookupLog(user=request.user,type=source,target=target_map[target],query=terms,parsed_query=query,num_results=0)
 				log.save()
 				
 				db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
@@ -349,10 +444,11 @@ def moderation_search(request):
 							</tbody>
 						</table>''' % results
 
-				log.results = count
+				log.num_results = count
+				log.results = result
 				log.save()
 
-				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': count})
+				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': count, 'logid': log.id})
 			elif source == 'logs':
 				if not request.user.has_perm('diablo2.moderation_investigate_logs'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
@@ -365,11 +461,11 @@ def moderation_search(request):
 				if not target in ['activity-ip','activity-account','activity-character','ip-account','ip-character','ip-ip','gamelist-ip','gamelist-account','gamelist-character','gameinfo','account-ip']:
 					return JsonResponse({'success':False,'message':'Invalid target for log search', 'type': 'error', 'title': 'Error'})
 
-				parsed_terms = re.sub('[^\w_\-\[\]\'\*\.]','',terms)
+				parsed_terms = re.sub('[^\w_\ \-\[\]\'\*\.]','',terms)
 				if not parsed_terms or not len(parsed_terms) or not len(parsed_terms.replace('*','')):
 					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
 
-				log = LookupLog(user=request.user,type=source,target=target,query=terms,parsed_query=parsed_terms,results=0)
+				log = LookupLog(user=request.user,type=source,target=target,query=terms,parsed_query=parsed_terms,num_results=0)
 				log.save()
 
 				if target == 'gameinfo':
@@ -420,7 +516,7 @@ def moderation_search(request):
 							</table>
 						''' % results
 
-					log.results = count
+					log.num_results = count
 					log.save()
 
 				else:
@@ -481,7 +577,7 @@ def moderation_search(request):
 								</table>
 							''' % results
 	
-						log.results = count
+						log.num_results = count
 						log.save()
 
 					elif t == 'ip':
@@ -514,7 +610,7 @@ def moderation_search(request):
 								</table>
 							''' % results
 	
-						log.results = len(ips)
+						log.num_results = len(ips)
 						log.save()
 					elif t == 'gamelist':
 
@@ -547,7 +643,7 @@ def moderation_search(request):
 								</table>
 							''' % results
 	
-						log.results = count
+						log.num_results = count
 						log.save()
 					elif t == 'account':
 
@@ -580,21 +676,24 @@ def moderation_search(request):
 								</table>
 							''' % results
 	
-						log.results = len(accounts)
+						log.num_results = len(accounts)
 						log.save()
 					else:
 						result = 'Not implemented'
 						short_query = '%s = %s' % (target,terms)
+					log.results = result
+					log.save()
 
-				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': log.results})
+				return JsonResponse({'success': True, 'query': short_query, 'result': result, 'count': log.num_results, 'logid': log.id})
 			elif source == 'report':
 				if not request.user.has_perm('diablo2.moderation_investigate_report'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
 
 				report_status,created = Variable.objects.get_or_create(name = 'diablo2_report_%s' % request.user.username, defaults={'json': '{}'})
 				rs_json = json.loads(report_status.json)
-#				if rs_json.get('report_active',False):
-#					return JsonResponse({'success': False, 'message': 'You already have a running report. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
+
+				if rs_json.get('report_active',False):
+					return JsonResponse({'success': False, 'message': 'You already have a running report. Wait for it to finish before running another.', 'type': 'warn', 'title': 'Please Wait'})
 
 				report_id = request.POST.get('reportid',False)
 		
@@ -613,7 +712,7 @@ def moderation_search(request):
 				if report_id:
 					report = Report.objects.get(id=int(report_id))
 					ignore = report.ignores
-					log = LookupLog(user=request.user,type='report-continue',target=report_id,query='',parsed_query='',results=0)
+					log = LookupLog(user=request.user,type='report-continue',target=report_id,query='',parsed_query='',num_results=0)
 					
 					new_accounts = []
 					for term in report.processed.split(','):
@@ -639,7 +738,7 @@ def moderation_search(request):
 					if not terms or not len(terms):
 						return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
 
-					log = LookupLog(user=request.user,type=source,target='account',query=terms,parsed_query='',results=0)
+					log = LookupLog(user=request.user,type=source,target='account',query=terms,parsed_query='',num_results=0)
 
 
 
@@ -662,17 +761,13 @@ def moderation_search(request):
 				report_status.json = json.dumps(rs_json)
 				report_status.save()
 
-				if True:
-#				try:
+				try:
 					if not final:
 						for account in new_accounts:
 							if account.lower() in ignore_accounts:
-								print "Ignoring account %s" % account
 								continue
 							if account in accounts:
-								print "Already searched account %s" % account
 								continue
-							print "Searching for IPs by account %s" % account
 		
 							entries = GameserverLog.objects.filter(account_name=account).exclude(ip=None).only('ip')
 							current_ips = []
@@ -685,25 +780,19 @@ def moderation_search(request):
 											continue
 										new_ips.append(entry.ip)
 										current_ips.append(entry.ip)
-										print "New IP %s" % entry.ip
 									else:
 										current_ips.append(entry.ip)
-										print 'Already checked %s' % entry.ip
 								elif entry.ip not in current_ips:
 									current_ips.append(entry.ip)
-									print 'Already checked %s' % entry.ip
 			
 							accounts.append(account)
 		
 						new_accounts = []
 						for ip in new_ips:
 							if ip in ignore_ips:
-								print "Ignoring IP %s" % ip
 								continue
 							if ip in ips:
-								print "Already Searched %s" % ip
 								continue
-							print "Searching for accounts by IP %s" % ip
 							entries = GameserverLog.objects.filter(ip=ip).only('account_name')
 							current_accounts = []
 							for entry in entries:
@@ -715,13 +804,10 @@ def moderation_search(request):
 											continue
 										new_accounts.append(entry.account_name)
 										current_accounts.append(entry.account_name)
-										print "New account %s" % entry.account_name
 									else:
 										current_accounts.append(entry.account_name)
-										print "Already searched %s" % entry.account_name
 								elif entry.account_name not in current_accounts:
 									current_accounts.append(entry.account_name)
-									print "Already searched %s" % entry.account_name
 							ips.append(ip)
 		
 					final = final or len(new_accounts) == 0
@@ -951,9 +1037,7 @@ def moderation_search(request):
 					rs_json['report_active'] = False
 					report_status.json = json.dumps(rs_json)
 					report_status.save()
-				else:
-#				except Exception,e:
-					print "Report failed: %s" % e
+				except Exception,e:
 					rs_json['report_active'] = False
 					report_status.json = json.dumps(rs_json)
 					report_status.save()
@@ -997,17 +1081,12 @@ def kill_multibox():
 
 	for ip in ips.keys():		
 		kick = False
-		print '\n%s\t%d\t' % (ip,ips[ip]['count']),
 		if ips[ip]['count'] > int(Variable.objects.get(name='diablo2_max_connections').value):
-			print '\n\tMore connections than allowed from ip %s, kicking chars' % (settings.DIABLO2MAXCONN,ip)
 			kick = True
 		for acct,char in ips[ip]['accounts']:
 			if kick:
 				tn.write('kick %s\n' % char)
 				tn.read_until('D2GS>')
-				print '\n\t\tKicking *%s on %s' % (acct, char),
-			else:
-				print '*%s on %s, ' % (acct, char),
 		if kick:
 			ActionLog(action='Kill Multibox',target='%s - %s - %s' % (ip,ips[ip]['count'],','.join('*%s on %s' % (x[0],x[1]) for x in ips[ip]['accounts'])))			
 

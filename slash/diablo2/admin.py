@@ -6,7 +6,7 @@ class AccountAdmin(admin.ModelAdmin):
 	list_display = ('name','owner','admin','locked','commandgroups','lastlogin','lastlogin_ip','status')
 
 class LookupLogAdmin(admin.ModelAdmin):
-	list_display = ('user','type','target','query','parsed_query','results')
+	list_display = ('user','type','target','query','parsed_query','date','num_results')
 
 class CharacterAdmin(admin.ModelAdmin):
 	list_display = ('name','account','level','cclass','hardcore','created','last_update')

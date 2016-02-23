@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 
 from django.db import models
 
@@ -40,6 +41,7 @@ class Account(models.Model):
 			("moderation_gamelist", 			"Can access the game info section"),
 			("moderation_history", 				"Can access the history section"),
 			("moderation_system", 				"Can access the system secton"),
+			("moderation_investigate_charname", 		"Can investigate character account names"),
 			("moderation_investigate_database", 		"Can investigate using the database"),
 			("moderation_investigate_database_password", 	"Can investigate using the database and lookup matching passwords"),
 			("moderation_investigate_logs", 		"Can investigate using the logs"),
@@ -68,7 +70,18 @@ class Account(models.Model):
 			("moderation_system_status",		"Can view system status"),
 			("moderation_gamelist_list",		"Can view gamelist"),
 			("moderation_gamelist_detail",		"Can view game details"),
+			("moderation_passwords",		"Can view various passwords"),
+			("moderation_passwords_discord",	"Can view discord password"),
+			("moderation_passwords_subreddit",	"Can view subreddit password"),
+			("moderation_passwords_telnet",		"Can view telnet password"),
+			("moderation_passwords_game",		"Can view in game moderator password"),
 		)
+
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_accounts_all')
+		cache.delete('diablo2_accounts_%s' % self.owner.id)
+		print "deleting cache for accounts"
+		super(Account, self).save(*args, **kwargs)
 
 	def __unicode__(self):
 		return self.name
@@ -95,6 +108,13 @@ class Character(models.Model):
 	last_update = models.DateTimeField(blank=True,null=True,help_text='Last time the character was updated')
 	info = models.TextField(blank=True)
 	expansion = models.BooleanField(default=True,help_text='Character is expansion')
+	checksum = models.CharField(max_length=25,help_text='Character Checksum')
+
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_characters_all')
+		cache.delete('diablo2_characters_%s' % self.account.owner.id)
+		print "deleting chartacter cache"
+		super(Character, self).save(*args, **kwargs)
 
 	class Meta:
 		verbose_name = "Character"
@@ -141,6 +161,10 @@ class GameserverLog(models.Model):
 	cclass = models.CharField(blank=True,null=True,max_length=10,help_text='Character class')
 	level = models.IntegerField(blank=True,null=True,default=1,help_text='Character Level')
 
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_gameserver_log')
+		super(GameserverLog, self).save(*args, **kwargs)
+
 	class Meta:
 		verbose_name = "Gameserver Log"
 
@@ -153,7 +177,13 @@ class LookupLog(models.Model):
 	target = models.CharField(blank=False,null=False,max_length=20,help_text='Target of lookup')
 	query = models.CharField(blank=False,null=False,max_length=255,help_text='User provided query')
 	parsed_query = models.CharField(blank=False,null=False,max_length=255,help_text='Actual query run')
-	results = models.IntegerField(help_text='Number of results')
+	num_results = models.IntegerField(help_text='Number of results')
+	date = models.DateTimeField(auto_now_add=True,help_text='When the lookup was preformed')
+	results = models.TextField(blank=True,null=True,help_text='Lookup results')
+	
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_lookup_log')
+		super(LookupLog, self).save(*args, **kwargs)
 
 	class Meta:
 		verbose_name = "Lookup Log"
@@ -166,6 +196,10 @@ class ActionLog(models.Model):
 	action = models.CharField(blank=False,null=False,max_length=20,help_text='Which action was done')
 	target = models.CharField(blank=False,null=False,max_length=255,help_text='Target of action')
 	date = models.DateTimeField(auto_now_add=True,help_text='When the action was preformed')
+
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_action_log')
+		super(ActionLog, self).save(*args, **kwargs)
 
 	class Meta:
 		verbose_name = "Action Log"
@@ -186,6 +220,10 @@ class Report(models.Model):
 	next = models.TextField(blank=True,null=True,help_text='List of accounts and ips to search next')
 	depth = models.IntegerField(default=1,help_text='Depth of search')
 
+
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_report_log')
+		super(Report, self).save(*args, **kwargs)
 
 	class Meta:
 		verbose_name = "Report"
