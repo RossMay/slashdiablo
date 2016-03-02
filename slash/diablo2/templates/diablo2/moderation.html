@@ -14,7 +14,8 @@
         	        $(document).ready(function () {
 	                        var oTable = $('#report_list').dataTable({
                                                 	        "oLanguage": {
-                                        	                        "sSearch": "Search all columns:"
+                                        	                        "sSearch": "Search all columns:",
+									"sInfoThousands": ","
                                 	                        },
                         	                                'iDisplayLength': 12,
                 	                                        "sPaginationType": "full_numbers",
@@ -23,7 +24,8 @@
 	                                        });
 	                        var oTable = $('#lookup_list').dataTable({
                                                 	        "oLanguage": {
-                                        	                        "sSearch": "Search all columns:"
+                                        	                        "sSearch": "Search all columns:",
+									"sInfoThousands": ","
                                 	                        },
                         	                                'iDisplayLength': 12,
                 	                                        "sPaginationType": "full_numbers",
@@ -32,7 +34,8 @@
 	                                        });
 	                        var oTable = $('#action_list').dataTable({
                                                 	        "oLanguage": {
-                                        	                        "sSearch": "Search all columns:"
+                                        	                        "sSearch": "Search all columns:",
+									"sInfoThousands": ","
                                 	                        },
                         	                                'iDisplayLength': 12,
                 	                                        "sPaginationType": "full_numbers",
@@ -179,6 +182,56 @@
 						new PNotify({
 							title: 'Account Lookup Complete',
 							text: 'Account lookup for ' + message.query + ' was completed',
+							type: 'success'
+						});
+
+					}else{
+						new PNotify({
+							title: message.title,
+							text: message.message,
+							type: message.type
+						});
+						
+					}
+				});
+			});
+			{% endif %}
+			{% if perms.diablo2.moderation_investigate_charlist %}
+			$('.charlist-search').click(function(event){
+				event.preventDefault();
+				$.ajax({
+					method: "POST",
+					beforeSend: function(request){
+						request.setRequestHeader('X-CSRFToken',Cookies.get('csrftoken'));
+					},
+					url: "/diablo2/moderation/search/",
+					data: {
+						action: 'search',
+						source: 'charlist',
+						target: 'file',
+						terms: $('#charlist_query').val()
+					}
+				}).done(function(message){
+					if (message.success){
+						results = $('<div class="row">'+
+								'<div class="col-md-12">'+
+									'<div class="x_panel">'+
+										'<div class="x_title">'+
+											'<h2>Character List Lookup<small>' + message.query+' <a target="_blank" class="btn btn-default btn-xs" href="/diablo2/moderation/lookup/'+ message.logid +'">Permalink</a></small></h2>'+
+											'<div class="clearfix"></div>'+
+										'</div>'+
+										'<div class="x_content">'+
+											message.result+
+										'</div>'+
+									'</div>'+
+								'</div>',+
+							'</div>');
+
+
+						$('#charlist-results').prepend(results);
+						new PNotify({
+							title: 'Character List Lookup Complete',
+							text: 'Character list lookup for ' + message.query + ' was completed',
 							type: 'success'
 						});
 
@@ -431,6 +484,7 @@
 								{% if perms.diablo2.moderation_investigate_logs %}<li><a href="#i-log-tab" data-toggle="tab">Logs</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_report %}<li><a href="#i-report-tab" data-toggle="tab">Report</a></li>{% endif %}
 								{% if perms.diablo2.moderation_investigate_charname %}<li><a href="#i-charname-tab" data-toggle="tab">Account Lookup</a></li>{% endif %}
+								{% if perms.diablo2.moderation_investigate_characterlist %}<li><a href="#i-charlist-tab" data-toggle="tab">Character List</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-10">
@@ -531,6 +585,23 @@
                                         				</div>
 									<div class="col-md-12">
 										<div id="charname-results"></div>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_investigate_characterlist %}
+								<div class="tab-pane" id="i-charlist-tab">
+									<div class="col-md-12">
+										<p class="lead">Account Character List</p>
+										<p>Lookup a list of characters for a given account</p>
+				                                                <div class="input-group col-xs-9">
+											<input id='charlist_query' type="text" class="form-control" aria-label="Account Name">
+											<div class="input-group-btn">
+												<button type="button" class="charlist-search btn btn-primary">List</button>
+											</div>
+										</div>
+                                        				</div>
+									<div class="col-md-12">
+										<div id="charlist-results"></div>
 									</div>
 								</div>
 								{% endif %}

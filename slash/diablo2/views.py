@@ -67,21 +67,21 @@ def moderation(request):
 	prev_ignores,created = Variable.objects.get_or_create(name = 'diablo2_report_ignore_%s' % request.user.username, defaults={'json': '{}'})
 	context['report_ignore'] = json.loads(prev_ignores.json).get('ignore','')
 
-	if request.user.has_perm('diablo2_moderation_history_report'):
+	if request.user.has_perm('diablo2.moderation_history_report'):
 		reports = cache.get('diablo2_report_log')
 		if not reports:
 			reports = Report.objects.all()
 			cache.set('diablo2_report_log',reports,300)
 		context['reports'] = reports
 
-	if request.user.has_perm('diablo2_moderation_history_lookup'):
+	if request.user.has_perm('diablo2.moderation_history_lookup'):
 		lookups = cache.get('diablo2_lookup_log')
 		if not lookups:
 			lookups = LookupLog.objects.all()
 			cache.set('diablo2_lookup_log',lookups,300)
 		context['lookups'] = lookups
 
-	if request.user.has_perm('diablo2_moderation_history_action'):
+	if request.user.has_perm('diablo2.moderation_history_action'):
 		actions = cache.get('diablo2_action_log')
 		if not actions:
 			actions = ActionLog.objects.all()
@@ -352,6 +352,37 @@ def moderation_search(request):
 				log.save()
 
                                 return JsonResponse({'success': True, 'query': 'charname = %s' % terms, 'result': result, 'count':count, 'logid': log.id})
+			elif source == 'charlist':
+				if not request.user.has_perm('diablo2.moderation_investigate_characterlist'):
+                                        return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
+                                terms = request.POST.get('terms',False)
+
+				parsed_terms = re.sub('[^\w_\-\[\]]','',terms).lower()
+				if not parsed_terms or not len(parsed_terms):
+					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
+
+				log = LookupLog(user=request.user,type=source,target='file',query=terms,parsed_query=parsed_terms,num_results=0)
+				log.save()
+				
+				chars = []
+				if os.path.isdir('/home/slashdiablo/pvpgn/var/charinfo/%s/' % parsed_terms):
+					for f in os.listdir('/home/slashdiablo/pvpgn/var/charinfo/%s/' % parsed_terms):
+						chars.append(f)
+					if not len(chars):
+						result = "No characters on account %s" % terms
+					else:
+						result = "<br/>".join(x for x in chars)
+				else:
+					result = "No match for account %s" % terms
+
+
+				count = len(chars)
+
+				log.num_results = count
+				log.results = result
+				log.save()
+
+                                return JsonResponse({'success': True, 'query': 'account = %s' % terms, 'result': result, 'count':count, 'logid': log.id})
 			elif source == 'database':
 				if not request.user.has_perm('diablo2.moderation_investigate_database'):
 					return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})

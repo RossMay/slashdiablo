@@ -48,6 +48,7 @@ class Account(models.Model):
 			("moderation_investigate_report", 		"Can generate reports"),
 			("moderation_investigate_account", 		"Can investigate via account model "),
 			("moderation_investigate_character", 		"Can investigate via character model"),
+			("moderation_investigate_characterlist", 	"Can investigate character list from account"),
 			("moderation_action_lock", 			"Can preform account lock"),
 			("moderation_action_unlock", 			"Can preform account unlock"),
 			("moderation_action_ban", 			"Can preform ip ban"),
