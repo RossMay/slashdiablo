@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from django.conf import settings
 from django.utils import timezone
 
-from .models import FailedLog,GameserverLog,ActionLog
+from .models import FailedLog,GameserverLog,ActionLog,Stat
 
 from base.models import Variable
 
@@ -17,6 +17,16 @@ import json, random, telnetlib
 def log_cleanup():
 	before = datetime.datetime.now() - datetime.timedelta(days=20)
 	GameserverLog.objects.filter(date__lte=before).delete()
+
+@shared_task()
+def stats_serverinfo():
+	serverdat = open('/home/slashdiablo/pvpgn/var/status/server.dat','r').read()
+	info = {
+		'users': int(re.findall(r'Users=(\d+)',serverdat)[0]),
+		'games': int(re.findall(r'Games=(\d+)',serverdat)[0]),
+		'channels': int(re.findall(r'Channels=(\d+)',serverdat)[0])
+	}
+	Stat(date=timezone.make_aware(datetime.datetime.now(),pytz.timezone('UTC')),type='activity',data=json.dumps(info)).save()
 
 @shared_task
 def kill_multibox():

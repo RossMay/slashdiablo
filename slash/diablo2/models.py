@@ -231,3 +231,25 @@ class Report(models.Model):
 
 	def __unicode__(self):
 		return self.target
+
+class Stat(models.Model):
+	TYPE = (
+		('activity','Player Activity'),
+	)
+
+	date = models.DateTimeField(help_text='Stat recorded time')
+	type = models.CharField(choices=TYPE,max_length=25,help_text='Stat type')
+
+	value = models.IntegerField(blank=True,null=True)
+	data = models.TextField(blank=True,null=True, default='{}')
+
+
+	def save(self, *args, **kwargs):
+		cache.delete('diablo2_stats_%s' % self.type)
+		super(Stat, self).save(*args, **kwargs)
+
+	class Meta:
+		verbose_name = "Statistics"
+
+	def __unicode__(self):
+		return self.type

@@ -158,22 +158,26 @@
 					<div class="">
 						<div class="page-title">
 				                        <div class="title_left">
-                        				        <h3>Something to look at?</h3>
+                        				        <h3>SlashGaming</h3>
 			        	                </div>
 				                </div>
 				                <div class="clearfix"></div>
 				                <div class="row">
 				                        <div class="col-md-12">
                         			        	<div class="x_panel">
-			                        	                <div class="x_title">
-                        				                        <h2>Why not Meanski?</h2>
-				                                                <div class="clearfix"></div>
-	                        			                </div>
-			                                        	<div class="x_content">
-										<img src="https://cdn.discordapp.com/avatars/119708174327480325/bd67ef0e8bf71ed652f5005c5c40e13b.jpg">
-
-                        			        	        </div>
-			                        	        </div>
+									<div class="row x_title">
+                                						<div class="col-md-12">
+											<h3>Activity <small>Diablo2 past 7 days</small></h3>
+						                                </div>
+					                                </div>
+									<div class="col-md-12 col-sm-12 col-xs-12">
+	                                					<div id="placeholder33" style="height: 260px; display: none" class="demo-placeholder"></div>
+							                                <div style="width: 100%;">
+							                                    <div id="canvas_dahs" class="demo-placeholder" style="width: 100%; height:270px;"></div>
+								                        </div>
+								                </div>
+			                        		        </div>
+					                        </div>
 			                	        </div>
 			        	        </div>
 				        </div>
@@ -220,6 +224,77 @@
 
 	<script src="/media/theme/js/custom.js"></script>
 	{% block extra-scripts %}
+	<!-- flot js -->
+    <!--[if lte IE 8]><script type="text/javascript" src="/media/theme/js/excanvas.min.js"></script><![endif]-->
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.pie.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.orderBars.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.time.min.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/date.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.spline.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.stack.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/curvedLines.js"></script>
+    <script type="text/javascript" src="/media/theme/js/flot/jquery.flot.resize.js"></script>
+
+    <!-- flot -->
+	<script>
+	 $(document).ready(function () {
+                var games = [{% for g in games %}[gd({{g.date.year }}, {{ g.date.month }}, {{ g.date.day }}, {{ g.date.hour }}, {{ g.date.minute }}), {{ g.value }}]{% if not forloop.last %},{% endif %}{% endfor %}];
+                var users = [{% for u in users %}[gd({{u.date.year }}, {{ u.date.month }}, {{ u.date.day }}, {{ u.date.hour }}, {{ u.date.minute }}), {{ u.value }}]{% if not forloop.last %},{% endif %}{% endfor %}];
+            $("#canvas_dahs").length && $.plot($("#canvas_dahs"), [
+                { label: " Games", data: games }, { label: " Users", data: users}
+            ], {
+                series: {
+                    lines: {
+                        show: false,
+                        fill: false
+                    },
+                    splines: {
+                        show: true,
+                        tension: 0.4,
+                        lineWidth: 1,
+                        fill: 0.3
+                    },
+                    points: {
+                        radius: 0,
+                        show: true
+                    },
+                    shadowSize: 2
+                },
+                grid: {
+                    verticalLines: true,
+                    hoverable: true,
+                    clickable: true,
+                    tickColor: "#d5d5d5",
+                    borderWidth: 1,
+                    color: '#fff'
+                },
+                colors: ["rgba(38, 185, 154, 0.38)", "rgba(3, 88, 106, 0.38)"],
+                xaxis: {
+                    tickColor: "rgba(51, 51, 51, 0.06)",
+                    mode: "time",
+                    tickSize: [3, "hour"],
+                    axisLabel: "Date",
+                    axisLabelUseCanvas: true,
+                    axisLabelFontSizePixels: 12,
+                    axisLabelFontFamily: 'Verdana, Arial',
+                    axisLabelPadding: 10
+                },
+                yaxis: {
+                   ticks: 5,
+                    tickColor: "rgba(51, 51, 51, 0.06)",
+		   axisLabel: "Count",
+                },
+                tooltip: false
+            });
+
+            function gd(year, month, day, hour, minute) {
+                return new Date(year, month - 1, day, hour, minute).getTime();
+            }
+        });
+
+	</script>
+
 	{% endblock %}
 
 </body>

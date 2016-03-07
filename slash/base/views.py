@@ -3,15 +3,26 @@ from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseRedirect, HttpResponse
-
+from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 
-import json
+import json,pytz,datetime
 
+from diablo2.models import Stat
 
 @login_required
 def index(request):
-	return render(request, 'base.html', {})
+	activity = Stat.objects.filter(type='activity').filter(date__gt=timezone.make_aware(datetime.datetime.now()-datetime.timedelta(seconds=604800),pytz.timezone('UTC')))
+	games = []
+	users = []
+	channels = []
+	for a in activity:
+		info = json.loads(a.data)
+		games.append({'date': a.date,'value': info.get('games',0)})
+		users.append({'date': a.date,'value': info.get('users',0)})
+		channels.append({'date': a.date,'value': info.get('channels',0)})
+
+	return render(request, 'base.html', {'games':games,'users':users,'channels':channels})
 
 def user_login(request):
 	if request.method == 'POST':

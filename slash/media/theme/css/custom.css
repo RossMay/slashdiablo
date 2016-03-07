@@ -6361,3 +6361,6 @@ div.col-md-12-main{
  .rotate-180{
 	transform: rotate(180deg);
 }
+.legendLabel{
+	color: #666;
+}
