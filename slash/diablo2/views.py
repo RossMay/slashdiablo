@@ -98,7 +98,7 @@ def moderation(request):
 def account_sync(query):
 	db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 	cur = db.cursor()
-	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip FROM BNET where %s" % query)
+	cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip,acct_lastlogin_owner FROM BNET where %s" % query)
 
 	for row in cur.fetchall():
 		if not row[0]:
@@ -400,7 +400,7 @@ def moderation_search(request):
 					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
 
 				
-				target_map = { 'account': 'acct_username', 'email': 'acct_email', 'ip': 'acct_lastlogin_ip', 'password': 'acct_passhash1'}
+				target_map = { 'account': 'acct_username', 'email': 'acct_email', 'ip': 'acct_lastlogin_ip', 'password': 'acct_passhash1', 'owner':'acct_lastlogin_owner'}
 				if target == 'password':
 					if not request.user.has_perm('diablo2.moderation_investigate_database_password'):
 						return JsonResponse({'success': False, 'message': 'You do not have the required permission to do that.', 'type': 'error', 'title': 'Permission Denied'})
@@ -415,7 +415,7 @@ def moderation_search(request):
 				
 				db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
 				cur = db.cursor()
-				cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip,acct_passhash1 FROM BNET where %s" % query)
+				cur.execute("SELECT acct_username,acct_email,acct_userid,auth_admin,auth_operator,auth_lockk,auth_command_groups,acct_lastlogin_time,acct_lastlogin_ip,acct_passhash1,acct_lastlogin_owner FROM BNET where %s" % query)
 
 
 				results = ''
