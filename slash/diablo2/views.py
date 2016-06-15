@@ -456,10 +456,11 @@ def moderation_search(request):
 						'commandgroups': row[6],
 						'time': datetime.datetime.fromtimestamp(row[7]),
 						'ip': row[8],
-						'pass': md5.new(row[9]).hexdigest()
+						'pass': md5.new(row[9]).hexdigest(),
+						'owner': row[10]
 					}
 
-					results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
+					results = results + "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" %(
 								entry['name'],
 								entry['email'],
 								entry['pass'],
@@ -469,7 +470,8 @@ def moderation_search(request):
 								entry['locked'],
 								entry['commandgroups'],
 								entry['time'],
-								entry['ip']
+								entry['ip'],
+								entry['owner']
 							)
 					count = count +1
 				db.close()
@@ -490,6 +492,7 @@ def moderation_search(request):
 									<th>Command Groups</th>
 									<th>Last Login</th>
 									<th>Last IP</th>
+									<th>Owner</th>
 								</tr>
 							</thead>
 							<tbody>
