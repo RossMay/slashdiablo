@@ -414,7 +414,7 @@ def moderation_search(request):
 				if not terms or not len(terms):
 					return JsonResponse({'success':False,'message':'A search term is required', 'type': 'warn', 'title': 'Search Failed'})
 
-				if not target in ['ip','email','account','password']:
+				if not target in ['ip','email','account','password','owner']:
 					return JsonResponse({'success':False,'message':'Invalid target for database search', 'type': 'error', 'title': 'Error'})
 
 				parsed_terms = re.sub('[^\w_\-@\.\*]','',terms)
@@ -477,7 +477,7 @@ def moderation_search(request):
 				db.close()
 
 				if results == '':
-					results = '<tr><td colspan=9>No Results</td></tr>'
+					results = '<tr><td colspan=11>No Results</td></tr>'
 
 				result = '''	<table class='table table-bordered'>
 							<thead>
