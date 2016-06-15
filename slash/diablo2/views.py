@@ -93,6 +93,28 @@ def moderation(request):
 	if request.user.has_perm('diablo2.moderation_passwords_game'): context['accounts_game'] = json.loads(Variable.objects.get(name='diablo2_info_game').json)
 	if request.user.has_perm('diablo2.moderation_passwords_subreddit'): context['accounts_subreddit'] = json.loads(Variable.objects.get(name='diablo2_info_subreddit').json)
 
+
+	if request.user.has_perm('diablo2.moderation_history_newaccounts'):
+		newaccounts = cache.get('diablo2_newaccounts')
+		if not newaccounts:
+			newaccounts = []
+			db = MySQLdb.connect(host=settings.DIABLO2DB['HOST'],user=settings.DIABLO2DB['USER'],passwd=settings.DIABLO2DB['PASSWORD'],db=settings.DIABLO2DB['NAME'])
+	        	cur = db.cursor()
+			cur.execute("SELECT uid,acct_username,acct_email,acct_passhash1,acct_lastlogin_ip,acct_lastlogin_time FROM BNET ORDER BY uid DESC limit 200;")
+			for row in cur.fetchall():
+				if not row[0]:
+					continue
+				newaccounts.append({
+					'uid': row[0],
+					'username': row[1],
+					'email': row[2],
+					'password': md5.new(row[3]).hexdigest(),
+					'lastip': row[4],
+					'lastlogin': datetime.datetime.fromtimestamp(row[5]),
+				})
+			cache.set('diablo2_newaccounts',newaccounts,300)
+		context['newaccounts'] = newaccounts
+
 	return render(request,'diablo2/moderation.html',context)
 
 def account_sync(query):
@@ -330,7 +352,7 @@ def moderation_search(request):
 				try:
 					ret = subprocess.check_output(['find /home/slashdiablo/pvpgn/var/charinfo/ -name %s -type f' % parsed_terms],shell=True)
 					match = re.match(r'/home/slashdiablo/pvpgn/var/charinfo/(?P<account>[\w_\-\[\]]+)/.*',ret)
-				except exception, e:
+				except Exception, e:
 					cn_json['charname_active'] = False
 					charname_status.json = json.dumps(cn_json)
 					charname_status.save()

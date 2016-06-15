@@ -9,7 +9,7 @@
 	<script>
 		$(document).ready(function(){
 
-			{% if perms.diablo2.moderation_history_report %}
+			{% if perms.diablo2.moderation_history %}
                 	var asInitVals = new Array();
         	        $(document).ready(function () {
 	                        var oTable = $('#report_list').dataTable({
@@ -40,6 +40,16 @@
                         	                                'iDisplayLength': 12,
                 	                                        "sPaginationType": "full_numbers",
 								"aaSorting": [[ 2, "desc" ]],
+        	                                                "dom": 'lfrtip'
+	                                        });
+	                        var oTable = $('#newaccounts_list').dataTable({
+                                                	        "oLanguage": {
+                                        	                        "sSearch": "Search all columns:",
+									"sInfoThousands": ","
+                                	                        },
+                        	                                'iDisplayLength': 12,
+                	                                        "sPaginationType": "full_numbers",
+								"aaSorting": [[ 0, "desc" ]],
         	                                                "dom": 'lfrtip'
 	                                        });
                         	$("tfoot input").keyup(function () {
@@ -752,6 +762,7 @@
 								{% if perms.diablo2.moderation_history_report %}<li class="active"><a href="#h-report-tab" data-toggle="tab">Reports</a></li>{% endif %}
 								{% if perms.diablo2.moderation_history_lookup %}<li><a href="#h-lookup-tab" data-toggle="tab">Lookups</a></li>{% endif %}
 								{% if perms.diablo2.moderation_history_action %}<li><a href="#h-action-tab" data-toggle="tab">Action</a></li>{% endif %}
+								{% if perms.diablo2.moderation_history_newaccounts %}<li><a href="#h-newaccounts-tab" data-toggle="tab">New Accounts</a></li>{% endif %}
 							</ul>
 						</div>
 						<div class="col-xs-10">
@@ -842,6 +853,40 @@
                                                                 					        <td class=" "><span data-toggle="tooltip" data-placement="bottom" title="" data-original-title="{{action.target}}">{{ action.target|truncatechars:100 }}</span></td>
                                 				        	                                <td class=" "><span style="display:none;">{{ action.date|date:"Y/m/d H:i" }}</span>{{ action.date }}</td>
                                                                 					        <td class=" last">{% if action.user %}{{ action.user.username }}{% else %}Command Line{% endif %}</td>
+				                                                        	        </tr>
+                                				                                	{% endfor %}
+					                                                        </tbody>	
+        	                        				                </table>
+										</div>
+									</div>
+								</div>
+								{% endif %}
+								{% if perms.diablo2.moderation_history_newaccounts %}
+								<div class="tab-pane" id="h-newaccounts-tab">
+									<div class="col-md-12">
+										<p class="lead">Recent Account List</p>
+										<p>List of the most recent 200 accounts created</p>
+										<div class="input-group col-xs-10">
+											<table id="newaccounts_list" class="table table-striped responsive-utilities jambo_table">
+				                                                	        <thead>
+				                                                        	        <tr class="headings">
+				                                                                	        <th>UID </th>
+                                				                                        	<th>Username </th>
+                                				                                        	<th>Email </th>
+                                				                                        	<th>Password (Obscured) </th>
+	                                                                				        <th>Last IP </th>
+        	                        				                                        <th class="last">Last Login </th>
+                	                                                				</tr>
+					                                                        </thead>
+                                					                        <tbody>
+                                        	                        				{% for account in newaccounts %}
+				                	                                                <tr class="{% cycle 'odd' 'even' %} pointer">
+                                					                                        <td class=" ">{{ account.uid }}</td>
+                                					                                        <td class=" ">{{ account.username }}</td>
+                                					                                        <td class=" ">{{ account.email }}</td>
+                                					                                        <td class=" ">{{ account.password }}</td>
+                                					                                        <td class=" ">{{ account.lastip }}</td>
+                                                                					        <td class=" last">{{ account.lastlogin }}</td>
 				                                                        	        </tr>
                                 				                                	{% endfor %}
 					                                                        </tbody>	

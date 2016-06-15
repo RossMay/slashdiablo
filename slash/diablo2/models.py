@@ -62,6 +62,7 @@ class Account(models.Model):
 			("moderation_history_lookup_all",	"Can view history for lookups by everyone"),
 			("moderation_history_action", 		"Can view history for actions"),
 			("moderation_history_action_all",	"Can view history for actions by everyone"),
+			("moderation_history_newaccounts",	"Can view list of new accounts"),
 			("moderation_system_pvpgn_start",	"Can manage pvpgn and start processes"),
 			("moderation_system_pvpgn_stop",	"Can manage pvpgn and stop processes"),
 			("moderation_system_pvpgn_restart",	"Can manage pvpgn and restart processes"),
