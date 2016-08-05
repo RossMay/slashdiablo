@@ -182,7 +182,10 @@ def logs_sync(username='Unknown'):
 				else:
 					file = dir
 				sftp.get('%s' % file,localpath='/srv/slashdiablo/www/logs/%s-d2gs-%s.log' % (dir,r),callback=sftp_progress,preserve_mtime=True)
-				logs_parse.delay('/srv/slashdiablo/www/logs/%s-d2gs-%s.log' % (dir,r),remove=True)
+				try:
+					logs_parse.delay('/srv/slashdiablo/www/logs/%s-d2gs-%s.log' % (dir,r),remove=True)
+				except:
+					print "Failed to move the d2gs file, probably crashed last time."
 				subprocess.call("ssh slash@gs.slashdiablo.net 'cmd /c move C:\\D2GS\\log\\%s C:\\D2GS\\log\\Parsed\\%s-d2gs-%s.log'" % (dir,dir,r), shell=True)
 
 		if sftp.isfile('d2gs.log'):
