@@ -417,7 +417,7 @@ def moderation_search(request):
 				if not target in ['ip','email','account','password','owner']:
 					return JsonResponse({'success':False,'message':'Invalid target for database search', 'type': 'error', 'title': 'Error'})
 
-				parsed_terms = re.sub('[^\w_\-@\.\*]','',terms)
+				parsed_terms = re.sub('[^\w_\-@\.\*\ ]','',terms)
 				if not parsed_terms or not len(parsed_terms) or not len(parsed_terms.replace('*','')):
 					return JsonResponse({'success':False,'message':'Invalid search term', 'type': 'warn', 'title': 'Search Failed'})
 
